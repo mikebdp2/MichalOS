@@ -3,65 +3,91 @@
 ; ------------------------------------------------------------------
 
 ; ==================================================================
-; MichalOS Graphics functions
-; Some graphics routines have been borrowed from TachyonOS
+; MichalOS Sound functions (PC speaker, YM3812)
 ; ==================================================================
 
 ; ------------------------------------------------------------------
-; os_init_graphics_mode -- Initializes graphics mode.
+; os_speaker_tone -- Generate PC speaker tone (call os_speaker_off to turn off)
+; IN: AX = note frequency (in Hz)
+; OUT: None, registers preserved
+
+os_speaker_tone equ 32795
+
+; ------------------------------------------------------------------
+; os_speaker_raw_period -- Generate PC speaker tone (call os_speaker_off to turn off)
+; IN: AX = note period (= 105000000 / 88 / freq)
+; OUT: None, registers preserved
+
+os_speaker_raw_period equ 33107
+
+; ------------------------------------------------------------------
+; os_speaker_note_length -- Generate PC speaker tone for a set amount of time and then stop
+; IN: AX = note frequency, CX = length (in ticks)
+; OUT: None, registers preserved
+
+os_speaker_note_length equ 32900
+
+; ------------------------------------------------------------------
+; os_speaker_off -- Turn off PC speaker
 ; IN/OUT: None, registers preserved
 
-os_init_graphics_mode equ 33020
+os_speaker_off equ 32798
 
 ; ------------------------------------------------------------------
-; os_init_text_mode -- Deinitializes graphics mode.
+; os_speaker_muted -- Check if the PC speaker is muted
+; OUT: ZF set if muted, clear if not
+
+os_speaker_muted equ 33125
+
+; ------------------------------------------------------------------
+; os_start_adlib -- Starts the selected Adlib driver
+; IN: SI = interrupt handler, CX = prescaler, BL = number of channels
+; The interrupt will fire at 33144 Hz (the closest possible to 32768 Hz) divided by CX.
+; Common prescaler values:
+;		33 = ~1 kHz (1004.362 Hz)
+;		663 = ~50 Hz (49.991 Hz)
+;		1820 = ~18.2 Hz (18.211 Hz)
+; OUT: None, registers preserved
+
+os_start_adlib equ 32984
+
+; ------------------------------------------------------------------
+; os_stop_adlib -- Stops the Adlib driver
 ; IN/OUT: None, registers preserved
 
-os_init_text_mode equ 33095
+os_stop_adlib equ 33026
 
 ; ------------------------------------------------------------------
-; os_set_pixel -- Sets a pixel on the screen to a given value.
-; IN: ES = destination memory segment, CX = X coordinate, AX = Y coordinate, BL = color
-; OUT: None, registers preserved
+; os_adlib_regwrite -- Write to a YM3812 register
+; IN: AH/AL - register address/value to write
 
-os_set_pixel equ 33017
-
-; ------------------------------------------------------------------
-; os_draw_line -- Draws a line with the Bresenham's line algorithm.
-; Translated from an implementation in C (http://www.edepot.com/linebresenham.html)
-; IN: ES = destination memory segment, CX=X1, DX=Y1, SI=X2, DI=Y2, BL=colour
-; OUT: None, registers preserved
-
-os_draw_line equ 32999
+os_adlib_regwrite equ 32843
 
 ; ------------------------------------------------------------------
-; os_draw_rectangle -- Draws a rectangle.
-; IN: ES = destination memory segment, CX=X1, DX=Y1, SI=X2, DI=Y2, BL=colour, CF = set if filled or clear if not
-; OUT: None, registers preserved
+; os_adlib_mute -- Mute the YM3812's current state
+; IN/OUT: None
 
-os_draw_rectangle equ 33047
-
-; ------------------------------------------------------------------
-; os_draw_polygon -- Draws a freeform shape.
-; IN: ES = destination memory segment, BH = number of points, BL = colour, SI = location of shape points data
-; OUT: None, registers preserved
-; DATA FORMAT: x1, y1, x2, y2, x3, y3, etc
-
-os_draw_polygon equ 33002
+os_adlib_mute equ 33044
 
 ; ------------------------------------------------------------------
-; os_clear_graphics -- Clears the graphics screen with a given color.
-; IN: ES = destination memory segment, BL = colour to set
+; os_adlib_unmute -- Unmute the YM3812's current state
+; IN/OUT: None
+
+os_adlib_unmute equ 33089
+
+; ------------------------------------------------------------------
+; os_adlib_calcfreq -- Play a frequency
+; IN: AX - frequency, CL = channel
 ; OUT: None, registers preserved
 
-os_clear_graphics equ 33008
+os_adlib_calcfreq equ 32966
 
-; ----------------------------------------
-; os_draw_circle -- draw a circular shape
-; IN: ES = destination memory segment, AL = colour, BX = radius, CX = middle X, DX = middle y
+; ------------------------------------------------------------------
+; os_adlib_noteoff -- Turns off a note
+; IN: CL = channel
 ; OUT: None, registers preserved
 
-os_draw_circle equ 33005
+os_adlib_noteoff equ 33029
 
 ; ==================================================================
 ; MichalOS Text display output functions
@@ -379,6 +405,317 @@ os_draw_icon equ 33023
 os_option_menu equ 32876
 
 ; ==================================================================
+; MichalOS Graphics functions
+; Some graphics routines have been borrowed from TachyonOS
+; ==================================================================
+
+; ------------------------------------------------------------------
+; os_init_graphics_mode -- Initializes graphics mode.
+; IN/OUT: None, registers preserved
+
+os_init_graphics_mode equ 33020
+
+; ------------------------------------------------------------------
+; os_init_text_mode -- Deinitializes graphics mode.
+; IN/OUT: None, registers preserved
+
+os_init_text_mode equ 33095
+
+; ------------------------------------------------------------------
+; os_set_pixel -- Sets a pixel on the screen to a given value.
+; IN: ES = destination memory segment, CX = X coordinate, AX = Y coordinate, BL = color
+; OUT: None, registers preserved
+
+os_set_pixel equ 33017
+
+; ------------------------------------------------------------------
+; os_draw_line -- Draws a line with the Bresenham's line algorithm.
+; Translated from an implementation in C (http://www.edepot.com/linebresenham.html)
+; IN: ES = destination memory segment, CX=X1, DX=Y1, SI=X2, DI=Y2, BL=colour
+; OUT: None, registers preserved
+
+os_draw_line equ 32999
+
+; ------------------------------------------------------------------
+; os_draw_rectangle -- Draws a rectangle.
+; IN: ES = destination memory segment, CX=X1, DX=Y1, SI=X2, DI=Y2, BL=colour, CF = set if filled or clear if not
+; OUT: None, registers preserved
+
+os_draw_rectangle equ 33047
+
+; ------------------------------------------------------------------
+; os_draw_polygon -- Draws a freeform shape.
+; IN: ES = destination memory segment, BH = number of points, BL = colour, SI = location of shape points data
+; OUT: None, registers preserved
+; DATA FORMAT: x1, y1, x2, y2, x3, y3, etc
+
+os_draw_polygon equ 33002
+
+; ------------------------------------------------------------------
+; os_clear_graphics -- Clears the graphics screen with a given color.
+; IN: ES = destination memory segment, BL = colour to set
+; OUT: None, registers preserved
+
+os_clear_graphics equ 33008
+
+; ----------------------------------------
+; os_draw_circle -- draw a circular shape
+; IN: ES = destination memory segment, AL = colour, BX = radius, CX = middle X, DX = middle y
+; OUT: None, registers preserved
+
+os_draw_circle equ 33005
+
+; ==================================================================
+; MichalOS Keyboard input handling functions
+; ==================================================================
+
+; ------------------------------------------------------------------
+; os_wait_for_key -- Waits for keypress and returns key
+; Also handles the screensaver. TODO: move the screensaver code to "int.asm"
+; IN: None
+; OUT: AX = key pressed, other regs preserved
+
+os_wait_for_key equ 32786
+
+; ------------------------------------------------------------------
+; os_check_for_key -- Scans keyboard buffer for input, but doesn't wait
+; Also handles special keyboard shortcuts.
+; IN: None
+; OUT: AX = 0 if no key pressed, otherwise scan code
+
+os_check_for_key equ 32789
+
+; ==================================================================
+; MichalOS Port I/O functions
+; ==================================================================
+
+; ------------------------------------------------------------------
+; os_serial_port_enable -- Set up the serial port for transmitting data
+; IN: AX = 0 for normal mode (9600 baud), or 1 for slow mode (1200 baud)
+; OUT: None, registers preserved
+
+os_serial_port_enable equ 32954
+
+; ------------------------------------------------------------------
+; os_send_via_serial -- Send a byte via the serial port
+; IN: AL = byte to send via serial
+; OUT: AH = Bit 7 clear on success
+
+os_send_via_serial equ 32861
+
+; ------------------------------------------------------------------
+; os_get_via_serial -- Get a byte from the serial port
+; IN: None
+; OUT: AL = byte that was received, AH = Bit 7 clear on success
+
+os_get_via_serial equ 32864
+
+; ==================================================================
+; MichalOS Disk access functions
+; ==================================================================
+
+; ------------------------------------------------------------------
+; os_report_free_space -- Returns the amount of free space on disk
+; IN: None
+; OUT: AX = Number of sectors free
+
+os_report_free_space equ 32894
+
+; ------------------------------------------------------------------
+; os_get_file_list -- Generate comma-separated string of files on floppy
+; IN/OUT: AX = location to store zero-terminated filename string
+
+os_get_file_list equ 32831
+
+; ------------------------------------------------------------------
+; os_load_file -- Load a file into RAM
+; IN: AX = location of filename, ES:CX = location in RAM to load file
+; OUT: BX = file size (in bytes), carry set if file not found
+
+os_load_file equ 32801
+
+; --------------------------------------------------------------------------
+; os_write_file -- Save (max 64K) file to disk
+; IN: AX = filename, ES:BX = data location, CX = bytes to write
+; OUT: Carry clear if OK, set if failure
+
+os_write_file equ 32915
+
+; --------------------------------------------------------------------------
+; os_file_exists -- Check for presence of file on the floppy
+; IN: AX = filename location; OUT: carry clear if found, set if not
+
+os_file_exists equ 32918
+
+; --------------------------------------------------------------------------
+; os_create_file -- Creates a new 0-byte file on the floppy disk
+; IN: AX = location of filename
+; OUT: None, registers preserved
+
+os_create_file equ 32921
+
+; --------------------------------------------------------------------------
+; os_remove_file -- Deletes the specified file from the filesystem
+; IN: AX = location of filename to remove
+
+os_remove_file equ 32924
+
+; --------------------------------------------------------------------------
+; os_rename_file -- Change the name of a file on the disk
+; IN: AX = filename to change, BX = new filename (zero-terminated strings)
+; OUT: carry set on error
+
+os_rename_file equ 32927
+
+; --------------------------------------------------------------------------
+; os_get_file_size -- Get file size information for specified file
+; IN: AX = filename; OUT: EBX = file size in bytes (up to 4GB)
+; or carry set if file not found
+
+os_get_file_size equ 32930
+
+; --------------------------------------------------------------------------
+; os_get_file_datetime -- Get file write time/date information for specified file
+; IN: AX = filename; OUT: BX = time of creation (HHHHHMMMMMMSSSSS), CX = date of creation (YYYYYYYMMMMDDDDD)
+; or carry set if file not found
+
+os_get_file_datetime equ 33011
+
+; --------------------------------------------------------------------------
+; os_get_boot_disk -- Returns the boot disk number.
+; IN: None
+; OUT: DL = boot disk number for use in INT 13h calls
+
+os_get_boot_disk equ 33062
+
+; ==================================================================
+; MichalOS Miscellaneous functions
+; ==================================================================
+
+; ------------------------------------------------------------------
+; os_read_config_byte -- Reads a byte from the config
+; IN: BX = offset
+; OUT: AL = value
+
+os_read_config_byte equ 33134
+
+; ------------------------------------------------------------------
+; os_read_config_word -- Reads a word from the config
+; IN: BX = offset
+; OUT: AX = value
+
+os_read_config_word equ 33137
+
+; ------------------------------------------------------------------
+; os_write_config_byte -- Writes a byte to the config
+; NOTE: This will only affect the config in memory,
+; run os_save_config to save the changes to disk!
+; IN: BX = offset, AL = value
+; OUT: None, registers preserved
+
+os_write_config_byte equ 33140
+
+; ------------------------------------------------------------------
+; os_write_config_word -- Writes a byte to the config
+; NOTE: This will only affect the config in memory,
+; run os_save_config to save the changes to disk!
+; IN: BX = offset, AX = value
+; OUT: None, registers preserved
+
+os_write_config_word equ 33143
+
+; ------------------------------------------------------------------
+; os_save_config -- Saves the current config to disk
+; OUT: Carry set if error
+
+os_save_config equ 33146
+
+; ------------------------------------------------------------------
+; os_exit -- Exits the application, launches another one (if possible)
+; IN: AX = if not 0, then ptr to filename of application to be launched,
+;     BX = 1 if the application calling os_exit should be re-launched after
+;     the requested application exits
+; OUT: None, register preserved
+
+os_exit equ 32780
+
+; ------------------------------------------------------------------
+; os_clear_registers -- Clear all registers
+; IN: None
+; OUT: Cleared registers
+
+os_clear_registers equ 32975
+
+; ------------------------------------------------------------------
+; os_get_os_name -- Get the OS name string
+; IN: None
+; OUT: DS:SI = OS name string, zero-terminated
+
+os_get_os_name equ 33083
+
+; ------------------------------------------------------------------
+; os_get_memory -- Gets the amount of system RAM.
+; IN: None
+; OUT: AX = conventional memory (in kB), BX = high memory (in kB)
+
+os_get_memory equ 33050
+
+; ------------------------------------------------------------------
+; os_int_1Ah -- Middle-man between the INT 1Ah call and the kernel/apps (used for timezones).
+; IN/OUT: same as int 1Ah
+
+os_int_1Ah equ 33032
+
+; ==================================================================
+; MichalOS/MikeOS 4.5 BASIC interpreter
+; ==================================================================
+
+; ------------------------------------------------------------------
+; The BASIC interpreter execution starts here -- a parameter string
+; is passed in SI and copied into the first string, unless SI = 0
+
+os_run_basic equ 32963
+
+; ==================================================================
+; MichalOS Math functions
+; ==================================================================
+
+; ------------------------------------------------------------------
+; os_get_random -- Return a random integer between low and high (inclusive)
+; IN: AX = low integer, BX = high integer
+; OUT: CX = random integer
+
+os_get_random equ 32948
+
+; ------------------------------------------------------------------
+; os_bcd_to_int -- Converts a binary coded decimal number to an integer
+; IN: AL = BCD number
+; OUT: AX = integer value
+
+os_bcd_to_int equ 32846
+
+; ------------------------------------------------------------------
+; os_int_to_bcd -- Converts an integer to a binary coded decimal number
+; IN: AL = integer value
+; OUT: AL = BCD number
+
+os_int_to_bcd equ 33035
+
+; ------------------------------------------------------------------
+; os_math_power -- Calculates EAX^EBX.
+; IN: EAX^EBX = input
+; OUT: EAX = result
+
+os_math_power equ 33071
+
+; ------------------------------------------------------------------
+; os_math_root -- Approximates the EBXth root of EAX.
+; IN: EAX = input, EBX = root
+; OUT: EAX(EDX = 0) = result; EAX to EDX = range
+
+os_math_root equ 33074
+
+; ==================================================================
 ; MichalOS String manipulation functions
 ; ==================================================================
 
@@ -540,277 +877,15 @@ os_32int_to_string equ 33059
 os_string_to_32int equ 33068
 
 ; ==================================================================
-; MichalOS Miscellaneous functions
+; MichalOS ZX7 decompression routine
 ; ==================================================================
 
 ; ------------------------------------------------------------------
-; os_read_config_byte -- Reads a byte from the config
-; IN: BX = offset
-; OUT: AL = value
-
-os_read_config_byte equ 33134
-
-; ------------------------------------------------------------------
-; os_read_config_word -- Reads a word from the config
-; IN: BX = offset
-; OUT: AX = value
-
-os_read_config_word equ 33137
-
-; ------------------------------------------------------------------
-; os_write_config_byte -- Writes a byte to the config
-; NOTE: This will only affect the config in memory,
-; run os_save_config to save the changes to disk!
-; IN: BX = offset, AL = value
+; os_decompress_zx7 -- Decompresses ZX7-packed data.
+; IN: DS:SI = source, ES:DI = destination
 ; OUT: None, registers preserved
 
-os_write_config_byte equ 33140
-
-; ------------------------------------------------------------------
-; os_write_config_word -- Writes a byte to the config
-; NOTE: This will only affect the config in memory,
-; run os_save_config to save the changes to disk!
-; IN: BX = offset, AX = value
-; OUT: None, registers preserved
-
-os_write_config_word equ 33143
-
-; ------------------------------------------------------------------
-; os_save_config -- Saves the current config to disk
-; OUT: Carry set if error
-
-os_save_config equ 33146
-
-; ------------------------------------------------------------------
-; os_exit -- Exits the application, launches another one (if possible)
-; IN: AX = if not 0, then ptr to filename of application to be launched,
-;     BX = 1 if the application calling os_exit should be re-launched after
-;     the requested application exits
-; OUT: None, register preserved
-
-os_exit equ 32780
-
-; ------------------------------------------------------------------
-; os_clear_registers -- Clear all registers
-; IN: None
-; OUT: Cleared registers
-
-os_clear_registers equ 32975
-
-; ------------------------------------------------------------------
-; os_get_os_name -- Get the OS name string
-; IN: None
-; OUT: DS:SI = OS name string, zero-terminated
-
-os_get_os_name equ 33083
-
-; ------------------------------------------------------------------
-; os_get_memory -- Gets the amount of system RAM.
-; IN: None
-; OUT: AX = conventional memory (in kB), BX = high memory (in kB)
-
-os_get_memory equ 33050
-
-; ------------------------------------------------------------------
-; os_int_1Ah -- Middle-man between the INT 1Ah call and the kernel/apps (used for timezones).
-; IN/OUT: same as int 1Ah
-
-os_int_1Ah equ 33032
-
-; ==================================================================
-; MichalOS Sound functions (PC speaker, YM3812)
-; ==================================================================
-
-; ------------------------------------------------------------------
-; os_speaker_tone -- Generate PC speaker tone (call os_speaker_off to turn off)
-; IN: AX = note frequency (in Hz)
-; OUT: None, registers preserved
-
-os_speaker_tone equ 32795
-
-; ------------------------------------------------------------------
-; os_speaker_raw_period -- Generate PC speaker tone (call os_speaker_off to turn off)
-; IN: AX = note period (= 105000000 / 88 / freq)
-; OUT: None, registers preserved
-
-os_speaker_raw_period equ 33107
-
-; ------------------------------------------------------------------
-; os_speaker_note_length -- Generate PC speaker tone for a set amount of time and then stop
-; IN: AX = note frequency, CX = length (in ticks)
-; OUT: None, registers preserved
-
-os_speaker_note_length equ 32900
-
-; ------------------------------------------------------------------
-; os_speaker_off -- Turn off PC speaker
-; IN/OUT: None, registers preserved
-
-os_speaker_off equ 32798
-
-; ------------------------------------------------------------------
-; os_speaker_muted -- Check if the PC speaker is muted
-; OUT: ZF set if muted, clear if not
-
-os_speaker_muted equ 33125
-
-; ------------------------------------------------------------------
-; os_start_adlib -- Starts the selected Adlib driver
-; IN: SI = interrupt handler, CX = prescaler, BL = number of channels
-; The interrupt will fire at 33144 Hz (the closest possible to 32768 Hz) divided by CX.
-; Common prescaler values:
-;		33 = ~1 kHz (1004.362 Hz)
-;		663 = ~50 Hz (49.991 Hz)
-;		1820 = ~18.2 Hz (18.211 Hz)
-; OUT: None, registers preserved
-
-os_start_adlib equ 32984
-
-; ------------------------------------------------------------------
-; os_stop_adlib -- Stops the Adlib driver
-; IN/OUT: None, registers preserved
-
-os_stop_adlib equ 33026
-
-; ------------------------------------------------------------------
-; os_adlib_regwrite -- Write to a YM3812 register
-; IN: AH/AL - register address/value to write
-
-os_adlib_regwrite equ 32843
-
-; ------------------------------------------------------------------
-; os_adlib_mute -- Mute the YM3812's current state
-; IN/OUT: None
-
-os_adlib_mute equ 33044
-
-; ------------------------------------------------------------------
-; os_adlib_unmute -- Unmute the YM3812's current state
-; IN/OUT: None
-
-os_adlib_unmute equ 33089
-
-; ------------------------------------------------------------------
-; os_adlib_calcfreq -- Play a frequency
-; IN: AX - frequency, CL = channel
-; OUT: None, registers preserved
-
-os_adlib_calcfreq equ 32966
-
-; ------------------------------------------------------------------
-; os_adlib_noteoff -- Turns off a note
-; IN: CL = channel
-; OUT: None, registers preserved
-
-os_adlib_noteoff equ 33029
-
-; ==================================================================
-; MichalOS Disk access functions
-; ==================================================================
-
-; ------------------------------------------------------------------
-; os_report_free_space -- Returns the amount of free space on disk
-; IN: None
-; OUT: AX = Number of sectors free
-
-os_report_free_space equ 32894
-
-; ------------------------------------------------------------------
-; os_get_file_list -- Generate comma-separated string of files on floppy
-; IN/OUT: AX = location to store zero-terminated filename string
-
-os_get_file_list equ 32831
-
-; ------------------------------------------------------------------
-; os_load_file -- Load a file into RAM
-; IN: AX = location of filename, ES:CX = location in RAM to load file
-; OUT: BX = file size (in bytes), carry set if file not found
-
-os_load_file equ 32801
-
-; --------------------------------------------------------------------------
-; os_write_file -- Save (max 64K) file to disk
-; IN: AX = filename, ES:BX = data location, CX = bytes to write
-; OUT: Carry clear if OK, set if failure
-
-os_write_file equ 32915
-
-; --------------------------------------------------------------------------
-; os_file_exists -- Check for presence of file on the floppy
-; IN: AX = filename location; OUT: carry clear if found, set if not
-
-os_file_exists equ 32918
-
-; --------------------------------------------------------------------------
-; os_create_file -- Creates a new 0-byte file on the floppy disk
-; IN: AX = location of filename
-; OUT: None, registers preserved
-
-os_create_file equ 32921
-
-; --------------------------------------------------------------------------
-; os_remove_file -- Deletes the specified file from the filesystem
-; IN: AX = location of filename to remove
-
-os_remove_file equ 32924
-
-; --------------------------------------------------------------------------
-; os_rename_file -- Change the name of a file on the disk
-; IN: AX = filename to change, BX = new filename (zero-terminated strings)
-; OUT: carry set on error
-
-os_rename_file equ 32927
-
-; --------------------------------------------------------------------------
-; os_get_file_size -- Get file size information for specified file
-; IN: AX = filename; OUT: EBX = file size in bytes (up to 4GB)
-; or carry set if file not found
-
-os_get_file_size equ 32930
-
-; --------------------------------------------------------------------------
-; os_get_file_datetime -- Get file write time/date information for specified file
-; IN: AX = filename; OUT: BX = time of creation (HHHHHMMMMMMSSSSS), CX = date of creation (YYYYYYYMMMMDDDDD)
-; or carry set if file not found
-
-os_get_file_datetime equ 33011
-
-; --------------------------------------------------------------------------
-; os_get_boot_disk -- Returns the boot disk number.
-; IN: None
-; OUT: DL = boot disk number for use in INT 13h calls
-
-os_get_boot_disk equ 33062
-
-; ==================================================================
-; MichalOS Keyboard input handling functions
-; ==================================================================
-
-; ------------------------------------------------------------------
-; os_wait_for_key -- Waits for keypress and returns key
-; Also handles the screensaver. TODO: move the screensaver code to "int.asm"
-; IN: None
-; OUT: AX = key pressed, other regs preserved
-
-os_wait_for_key equ 32786
-
-; ------------------------------------------------------------------
-; os_check_for_key -- Scans keyboard buffer for input, but doesn't wait
-; Also handles special keyboard shortcuts.
-; IN: None
-; OUT: AX = 0 if no key pressed, otherwise scan code
-
-os_check_for_key equ 32789
-
-; ==================================================================
-; MichalOS/MikeOS 4.5 BASIC interpreter
-; ==================================================================
-
-; ------------------------------------------------------------------
-; The BASIC interpreter execution starts here -- a parameter string
-; is passed in SI and copied into the first string, unless SI = 0
-
-os_run_basic equ 32963
+os_decompress_zx7 equ 33038
 
 ; ==================================================================
 ; MichalOS Interrupt management & app timer functions
@@ -858,81 +933,6 @@ os_return_app_timer equ 32987
 ; OUT: Nothing, registers preserved
 
 os_set_timer_speed equ 32891
-
-; ==================================================================
-; MichalOS ZX7 decompression routine
-; ==================================================================
-
-; ------------------------------------------------------------------
-; os_decompress_zx7 -- Decompresses ZX7-packed data.
-; IN: DS:SI = source, ES:DI = destination
-; OUT: None, registers preserved
-
-os_decompress_zx7 equ 33038
-
-; ==================================================================
-; MichalOS Port I/O functions
-; ==================================================================
-
-; ------------------------------------------------------------------
-; os_serial_port_enable -- Set up the serial port for transmitting data
-; IN: AX = 0 for normal mode (9600 baud), or 1 for slow mode (1200 baud)
-; OUT: None, registers preserved
-
-os_serial_port_enable equ 32954
-
-; ------------------------------------------------------------------
-; os_send_via_serial -- Send a byte via the serial port
-; IN: AL = byte to send via serial
-; OUT: AH = Bit 7 clear on success
-
-os_send_via_serial equ 32861
-
-; ------------------------------------------------------------------
-; os_get_via_serial -- Get a byte from the serial port
-; IN: None
-; OUT: AL = byte that was received, AH = Bit 7 clear on success
-
-os_get_via_serial equ 32864
-
-; ==================================================================
-; MichalOS Math functions
-; ==================================================================
-
-; ------------------------------------------------------------------
-; os_get_random -- Return a random integer between low and high (inclusive)
-; IN: AX = low integer, BX = high integer
-; OUT: CX = random integer
-
-os_get_random equ 32948
-
-; ------------------------------------------------------------------
-; os_bcd_to_int -- Converts a binary coded decimal number to an integer
-; IN: AL = BCD number
-; OUT: AX = integer value
-
-os_bcd_to_int equ 32846
-
-; ------------------------------------------------------------------
-; os_int_to_bcd -- Converts an integer to a binary coded decimal number
-; IN: AL = integer value
-; OUT: AL = BCD number
-
-os_int_to_bcd equ 33035
-
-; ------------------------------------------------------------------
-; os_math_power -- Calculates EAX^EBX.
-; IN: EAX^EBX = input
-; OUT: EAX = result
-
-os_math_power equ 33071
-
-; ------------------------------------------------------------------
-; os_math_root -- Approximates the EBXth root of EAX.
-; IN: EAX = input, EBX = root
-; OUT: EAX(EDX = 0) = result; EAX to EDX = range
-
-os_math_root equ 33074
 
 ; ==================================================================
 ; MichalOS Low-level disk driver

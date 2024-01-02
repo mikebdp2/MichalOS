@@ -1,0 +1,2 @@
+cfb8c7d5561b83724cf45580b6fb4fb5e094cf851b507e6fbad41161f6a17d80  ./sub_desktop.asm
+a6b54f687b7f43b7b7a216ec3ffb3fa1a1928bd05fd5aa14052bf9503f43165b  ./sub_fatalerr.asm

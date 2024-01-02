@@ -1,0 +1,2005 @@
+     1                                  ; ------------------------------------------------------------------
+     2                                  ; MichalOS Terminal
+     3                                  ; ------------------------------------------------------------------
+     4                                  
+     5                                  	%INCLUDE "include/program.inc"
+     1                              <1> ; ------------------------------------------------------------------
+     2                              <1> ; Include file for MichalOS program or kernel module development
+     3                              <1> ; ------------------------------------------------------------------
+     4                              <1> 
+     5                              <1> 	BITS 16
+     6                              <1> 	ORG 100h
+     7                              <1> 	
+     8                              <1> 	%include "include/constants.asm"
+     1                              <2> ; ------------------------------------------------------------------
+     2                              <2> ; Include file for MichalOS kernel/program development - constants & macros
+     3                              <2> ; ------------------------------------------------------------------
+     4                              <2> 
+     5                              <2> ; ------------------------------------------------------------------
+     6                              <2> ; COLOURS (eg for os_draw_background and os_draw_block)
+     7                              <2> 
+     8                              <2> %DEFINE BLACK_ON_WHITE		11110000b
+     9                              <2> %DEFINE WHITE_ON_BLACK		00001111b
+    10                              <2> 
+    11                              <2> ; ------------------------------------------------------------------
+    12                              <2> ; KEYS
+    13                              <2> 
+    14                              <2> %DEFINE KEY_UP		72
+    15                              <2> %DEFINE KEY_DOWN	80
+    16                              <2> %DEFINE KEY_LEFT	75
+    17                              <2> %DEFINE KEY_RIGHT	77
+    18                              <2> 
+    19                              <2> %DEFINE KEY_ESC		27
+    20                              <2> %DEFINE KEY_ENTER	13
+    21                              <2> 
+    22                              <2> ; ------------------------------------------------------------------
+    23                              <2> ; MACROS
+    24                              <2> 
+    25                              <2> %macro syscall 1
+    26                              <2> 	mov bp, %1
+    27                              <2> 	call os_syscall
+    28                              <2> %endmacro
+    29                              <2> 
+    30                              <2> %macro clr 1
+    31                              <2> 	xor %1, %1
+    32                              <2> %endmacro
+    33                              <2> 
+    34                              <2> %macro mov16 3
+    35                              <2> 	mov %1, (%2 + %3 * 256)
+    36                              <2> %endmacro
+    37                              <2> 
+    38                              <2> %macro movs 2
+    39                              <2> 	push %2
+    40                              <2> 	pop %1
+    41                              <2> %endmacro
+    42                              <2> 
+    43                              <2> ; ------------------------------------------------------------------
+    44                              <2> ; MEMORY LOCATIONS
+    45                              <2> 
+    46                              <2> %define ADLIB_BUFFER 0500h
+    47                              <2> %define DESKTOP_BACKGROUND 0600h
+    48                              <2> %define SYSTEM_FONT 1600h
+    49                              <2> %define FILE_MANAGER 2600h
+    50                              <2> %define DISK_PARAMS 2E00h
+    51                              <2> 
+    52                              <2> %define DISK_BUFFER 0E000h
+    53                              <2> %define CONFIG_FILE 57000
+    54                              <2> %define CONFIG_FILE_SIZE 83
+    55                              <2> 
+    56                              <2> ; ------------------------------------------------------------------
+    57                              <2> ; CONFIG FILE LOCATIONS
+    58                              <2> 
+    59                              <2> %define CONFIG(x) (CONFIG_FILE + x)
+    60                              <2> 
+    61                              <2> ; 0 = Desktop background color (BYTE)
+    62                              <2> %define CONFIG_DESKTOP_BG_COLOR CONFIG(0)
+    63                              <2> 
+    64                              <2> ; 1 = Window background color (BYTE)
+    65                              <2> %define CONFIG_WINDOW_BG_COLOR CONFIG(1)
+    66                              <2> 
+    67                              <2> ; 2 = Password enabled (BYTE)
+    68                              <2> %define CONFIG_PASSWORD_ENABLED CONFIG(2)
+    69                              <2> 
+    70                              <2> ; 3 - 35 = Password data (STRING, 32 chars + '\0')
+    71                              <2> %define CONFIG_PASSWORD CONFIG(3)
+    72                              <2> %define CFG_PASSWORD_MAX_INPUT_LENGTH 32
+    73                              <2> %define CFG_PASSWORD_MAX_LENGTH 33
+    74                              <2> 
+    75                              <2> ; 36 - 68 = Username (STRING, 32 chars + '\0')
+    76                              <2> %define CONFIG_USERNAME CONFIG(36)
+    77                              <2> %define CFG_USERNAME_MAX_INPUT_LENGTH 32
+    78                              <2> %define CFG_USERNAME_MAX_LENGTH 33
+    79                              <2> 
+    80                              <2> ; 69 - Sound enabled on startup (BYTE)
+    81                              <2> %define CONFIG_SOUND_ENABLED CONFIG(69)
+    82                              <2> 
+    83                              <2> ; 70 - Adlib driver number
+    84                              <2> %define CONFIG_ADLIB_DRIVER CONFIG(70)
+    85                              <2> %define CFG_ADLIB_STD_DRIVER 0
+    86                              <2> %define CFG_ADLIB_PWM_DRIVER 1
+    87                              <2> %define CFG_ADLIB_PWM_LOUD_DRIVER 2
+    88                              <2> 
+    89                              <2> ; 71 - Menu screen dimming enabled (BYTE)
+    90                              <2> %define CONFIG_MENU_DIMMING CONFIG(71)
+    91                              <2> 
+    92                              <2> ; 72 - Menu color (BYTE)
+    93                              <2> %define CONFIG_MENU_BG_COLOR CONFIG(72)
+    94                              <2> 
+    95                              <2> ; 73 - "DOS" font enabled (BYTE)
+    96                              <2> %define CONFIG_FONT CONFIG(73)
+    97                              <2> %define CFG_FONT_MICHALOS 0
+    98                              <2> %define CFG_FONT_BIOS 1
+    99                              <2> 
+   100                              <2> ; 74 - Minutes to wait for screensaver (BYTE)
+   101                              <2> %define CONFIG_SCREENSAVER_MINUTES CONFIG(74)
+   102                              <2> 
+   103                              <2> ; 75 - System stack size in 16-byte blocks (WORD)
+   104                              <2> %define CONFIG_STACKSGMT_SIZE CONFIG(75)
+   105                              <2> 
+   106                              <2> ; 77 - 80 - Unused *******************************
+   107                              <2> 
+   108                              <2> ; 81 - Minute time offset (WORD)
+   109                              <2> %define CONFIG_TIMEZONE_OFFSET CONFIG(81)
+   110                              <2> 
+   111                              <2> ; ------------------------------------------------------------------
+   112                              <2> ; MUSICAL NOTE FREQUENCY LIST
+   113                              <2> 
+   114                              <2> A2		equ 110
+   115                              <2> AS2		equ 117
+   116                              <2> B2		equ 124
+   117                              <2> C3		equ 131
+   118                              <2> CS3		equ 139
+   119                              <2> D3		equ 147
+   120                              <2> DS3		equ 156
+   121                              <2> E3		equ 165
+   122                              <2> F3		equ 175
+   123                              <2> FS3		equ 185
+   124                              <2> G3		equ 196
+   125                              <2> GS3		equ 208
+   126                              <2> A3		equ 220
+   127                              <2> AS3		equ 233
+   128                              <2> B3		equ 247
+   129                              <2> C4		equ 262
+   130                              <2> CS4		equ 277
+   131                              <2> D4		equ 294
+   132                              <2> DS4		equ 311
+   133                              <2> E4		equ 330
+   134                              <2> F4		equ 349
+   135                              <2> FS4		equ 370
+   136                              <2> G4		equ 392
+   137                              <2> GS4		equ 415
+   138                              <2> A4		equ 440
+   139                              <2> AS4		equ 466
+   140                              <2> B4		equ 494
+   141                              <2> C5		equ 523
+   142                              <2> CS5		equ 554
+   143                              <2> D5		equ 587
+   144                              <2> DS5		equ 622
+   145                              <2> E5		equ 659
+   146                              <2> F5		equ 698
+   147                              <2> FS5		equ 740
+   148                              <2> G5		equ 784
+   149                              <2> GS5		equ 831
+   150                              <2> A5		equ 880
+   151                              <2> AS5		equ 932
+   152                              <2> B5		equ 988
+   153                              <2> C6		equ 1046
+   154                              <2> CS6		equ 1109
+   155                              <2> D6		equ 1175
+   156                              <2> DS6		equ 1245
+   157                              <2> E6		equ 1319
+   158                              <2> F6		equ 1397
+   159                              <2> FS6		equ 1480
+   160                              <2> G6		equ 1568
+   161                              <2> GS6		equ 1661
+   162                              <2> A6		equ 1760
+   163                              <2> AS6		equ 1865
+   164                              <2> B6		equ 1976
+   165                              <2> C7		equ 2093
+   166                              <2> CS7		equ 2217
+   167                              <2> D7		equ 2349
+   168                              <2> DS7		equ 2489
+   169                              <2> E7		equ 2637
+   170                              <2> F7		equ 2794
+   171                              <2> FS7		equ 2960
+   172                              <2> G7		equ 3136
+   173                              <2> GS7		equ 3322
+   174                              <2> A7		equ 3520
+   175                              <2> AS7		equ 3729
+   176                              <2> B7		equ 3951
+   177                              <2> C8		equ 4186
+   178                              <2> CS8		equ 4435
+   179                              <2> D8		equ 4699
+   180                              <2> DS8		equ 4978
+   181                              <2> E8		equ 5274
+   182                              <2> F8		equ 5588
+   183                              <2> FS8		equ 5920
+   184                              <2> G8		equ 6272
+   185                              <2> GS8		equ 6645
+   186                              <2> A8		equ 7040
+   187                              <2> AS8		equ 7459
+   188                              <2> B8		equ 7902
+     9                              <1> 	%include "include/syscalls.asm"
+     1                              <2> ; ------------------------------------------------------------------
+     2                              <2> ; Include file for MichalOS program development - syscalls
+     3                              <2> ; ------------------------------------------------------------------
+     4                              <2> 
+     5                              <2> ; ==================================================================
+     6                              <2> ; MichalOS Sound functions (PC speaker, YM3812)
+     7                              <2> ; ==================================================================
+     8                              <2> 
+     9                              <2> ; ------------------------------------------------------------------
+    10                              <2> ; os_speaker_tone -- Generate PC speaker tone (call os_speaker_off to turn off)
+    11                              <2> ; IN: AX = note frequency (in Hz)
+    12                              <2> ; OUT: None, registers preserved
+    13                              <2> 
+    14                              <2> os_speaker_tone equ 32795
+    15                              <2> 
+    16                              <2> ; ------------------------------------------------------------------
+    17                              <2> ; os_speaker_raw_period -- Generate PC speaker tone (call os_speaker_off to turn off)
+    18                              <2> ; IN: AX = note period (= 105000000 / 88 / freq)
+    19                              <2> ; OUT: None, registers preserved
+    20                              <2> 
+    21                              <2> os_speaker_raw_period equ 33107
+    22                              <2> 
+    23                              <2> ; ------------------------------------------------------------------
+    24                              <2> ; os_speaker_note_length -- Generate PC speaker tone for a set amount of time and then stop
+    25                              <2> ; IN: AX = note frequency, CX = length (in ticks)
+    26                              <2> ; OUT: None, registers preserved
+    27                              <2> 
+    28                              <2> os_speaker_note_length equ 32900
+    29                              <2> 
+    30                              <2> ; ------------------------------------------------------------------
+    31                              <2> ; os_speaker_off -- Turn off PC speaker
+    32                              <2> ; IN/OUT: None, registers preserved
+    33                              <2> 
+    34                              <2> os_speaker_off equ 32798
+    35                              <2> 
+    36                              <2> ; ------------------------------------------------------------------
+    37                              <2> ; os_speaker_muted -- Check if the PC speaker is muted
+    38                              <2> ; OUT: ZF set if muted, clear if not
+    39                              <2> 
+    40                              <2> os_speaker_muted equ 33125
+    41                              <2> 
+    42                              <2> ; ------------------------------------------------------------------
+    43                              <2> ; os_start_adlib -- Starts the selected Adlib driver
+    44                              <2> ; IN: SI = interrupt handler, CX = prescaler, BL = number of channels
+    45                              <2> ; The interrupt will fire at 33144 Hz (the closest possible to 32768 Hz) divided by CX.
+    46                              <2> ; Common prescaler values:
+    47                              <2> ;		33 = ~1 kHz (1004.362 Hz)
+    48                              <2> ;		663 = ~50 Hz (49.991 Hz)
+    49                              <2> ;		1820 = ~18.2 Hz (18.211 Hz)
+    50                              <2> ; OUT: None, registers preserved
+    51                              <2> 
+    52                              <2> os_start_adlib equ 32984
+    53                              <2> 
+    54                              <2> ; ------------------------------------------------------------------
+    55                              <2> ; os_stop_adlib -- Stops the Adlib driver
+    56                              <2> ; IN/OUT: None, registers preserved
+    57                              <2> 
+    58                              <2> os_stop_adlib equ 33026
+    59                              <2> 
+    60                              <2> ; ------------------------------------------------------------------
+    61                              <2> ; os_adlib_regwrite -- Write to a YM3812 register
+    62                              <2> ; IN: AH/AL - register address/value to write
+    63                              <2> 
+    64                              <2> os_adlib_regwrite equ 32843
+    65                              <2> 
+    66                              <2> ; ------------------------------------------------------------------
+    67                              <2> ; os_adlib_mute -- Mute the YM3812's current state
+    68                              <2> ; IN/OUT: None
+    69                              <2> 
+    70                              <2> os_adlib_mute equ 33044
+    71                              <2> 
+    72                              <2> ; ------------------------------------------------------------------
+    73                              <2> ; os_adlib_unmute -- Unmute the YM3812's current state
+    74                              <2> ; IN/OUT: None
+    75                              <2> 
+    76                              <2> os_adlib_unmute equ 33089
+    77                              <2> 
+    78                              <2> ; ------------------------------------------------------------------
+    79                              <2> ; os_adlib_calcfreq -- Play a frequency
+    80                              <2> ; IN: AX - frequency, CL = channel
+    81                              <2> ; OUT: None, registers preserved
+    82                              <2> 
+    83                              <2> os_adlib_calcfreq equ 32966
+    84                              <2> 
+    85                              <2> ; ------------------------------------------------------------------
+    86                              <2> ; os_adlib_noteoff -- Turns off a note
+    87                              <2> ; IN: CL = channel
+    88                              <2> ; OUT: None, registers preserved
+    89                              <2> 
+    90                              <2> os_adlib_noteoff equ 33029
+    91                              <2> 
+    92                              <2> ; ==================================================================
+    93                              <2> ; MichalOS Text display output functions
+    94                              <2> ; ==================================================================
+    95                              <2> 
+    96                              <2> ; ------------------------------------------------------------------
+    97                              <2> ; os_putchar -- Puts a character on the screen
+    98                              <2> ; IN: AL = character
+    99                              <2> ; OUT: None, registers preserved
+   100                              <2> 
+   101                              <2> os_putchar equ 32981
+   102                              <2> 
+   103                              <2> ; ------------------------------------------------------------------
+   104                              <2> ; os_put_chars -- Puts up to a set amount of characters on the screen
+   105                              <2> ; IN: BL = terminator, DS:SI = location, CX = character count
+   106                              <2> ; OUT: None, registers preserved
+   107                              <2> 
+   108                              <2> os_put_chars equ 32996
+   109                              <2> 
+   110                              <2> ; ------------------------------------------------------------------
+   111                              <2> ; os_print_string -- Displays text
+   112                              <2> ; IN: DS:SI = message location (zero-terminated string)
+   113                              <2> ; OUT: None, registers preserved
+   114                              <2> 
+   115                              <2> os_print_string equ 32771
+   116                              <2> 
+   117                              <2> ; ------------------------------------------------------------------
+   118                              <2> ; os_print_string_box -- Displays text inside a text-box.
+   119                              <2> ; IN: DS:SI = message location (zero-terminated string), DL = left alignment
+   120                              <2> ; OUT: None, registers preserved
+   121                              <2> 
+   122                              <2> os_print_string_box equ 32993
+   123                              <2> 
+   124                              <2> ; ------------------------------------------------------------------
+   125                              <2> ; os_format_string -- Displays colored text
+   126                              <2> ; IN: DS:SI = message location (zero-terminated string), BL = text color
+   127                              <2> ; OUT: None, registers preserved
+   128                              <2> 
+   129                              <2> os_format_string equ 32978
+   130                              <2> 
+   131                              <2> ; ------------------------------------------------------------------
+   132                              <2> ; os_clear_screen -- Clears the screen to background
+   133                              <2> ; IN/OUT: None, registers preserved
+   134                              <2> 
+   135                              <2> os_clear_screen equ 32777
+   136                              <2> 
+   137                              <2> ; ------------------------------------------------------------------
+   138                              <2> ; os_move_cursor -- Moves cursor in text mode
+   139                              <2> ; IN: DH, DL = row, column
+   140                              <2> ; OUT: None, registers preserved
+   141                              <2> 
+   142                              <2> os_move_cursor equ 32774
+   143                              <2> 
+   144                              <2> ; ------------------------------------------------------------------
+   145                              <2> ; os_get_cursor_pos -- Return position of text cursor
+   146                              <2> ; IN: None
+   147                              <2> ; OUT: DH, DL = row, column
+   148                              <2> 
+   149                              <2> os_get_cursor_pos equ 32870
+   150                              <2> 
+   151                              <2> ; ------------------------------------------------------------------
+   152                              <2> ; os_show_cursor -- Turns on cursor in text mode
+   153                              <2> ; IN/OUT: None, registers preserved
+   154                              <2> 
+   155                              <2> os_show_cursor equ 32903
+   156                              <2> 
+   157                              <2> ; ------------------------------------------------------------------
+   158                              <2> ; os_hide_cursor -- Turns off cursor in text mode
+   159                              <2> ; IN/OUT: None, registers preserved
+   160                              <2> 
+   161                              <2> os_hide_cursor equ 32906
+   162                              <2> 
+   163                              <2> ; ------------------------------------------------------------------
+   164                              <2> ; os_draw_block -- Render block of specified colour
+   165                              <2> ; IN: BL/DL/DH/SI/DI = colour/start X pos/start Y pos/width/finish Y pos
+   166                              <2> ; OUT: None, registers preserved
+   167                              <2> 
+   168                              <2> os_draw_block equ 32945
+   169                              <2> 
+   170                              <2> ; ------------------------------------------------------------------
+   171                              <2> ; os_file_selector -- Show a file selection dialog
+   172                              <2> ; IN: None
+   173                              <2> ; OUT: AX = location of filename string (or carry set if Esc pressed)
+   174                              <2> 
+   175                              <2> os_file_selector equ 32855
+   176                              <2> 
+   177                              <2> ; ------------------------------------------------------------------
+   178                              <2> ; os_file_selector_filtered -- Show a file selection dialog only 
+   179                              <2> ; with files mathing the filter
+   180                              <2> ; IN: ES:BX = location of file extension list (0 if none)
+   181                              <2> ; OUT: DS:AX = location of filename string (or carry set if Esc pressed)
+   182                              <2> 
+   183                              <2> os_file_selector_filtered equ 33122
+   184                              <2> 
+   185                              <2> ; ------------------------------------------------------------------
+   186                              <2> ; os_list_dialog_tooltip -- Show a dialog with a list of options and a tooltip.
+   187                              <2> ; That means, when the user changes the selection, the application will be called back
+   188                              <2> ; to change the tooltip's contents.
+   189                              <2> ; IN: DS:AX = comma-separated list of strings to show (zero-terminated),
+   190                              <2> ;     DS:BX = first help string, DS:CX = second help string
+   191                              <2> ;     SI = key/display callback (see os_list_dialog_ex)
+   192                              <2> ;     if AX = 0: DI = entry display callback, DX = number of entries
+   193                              <2> ; OUT: AX = number (starts from 1) of entry selected; carry set if Esc pressed
+   194                              <2> 
+   195                              <2> os_list_dialog_tooltip equ 32912
+   196                              <2> 
+   197                              <2> ; ------------------------------------------------------------------
+   198                              <2> ; os_list_dialog -- Show a dialog with a list of options
+   199                              <2> ; IN: ES:AX = comma-separated list of strings to show (zero-terminated),
+   200                              <2> ;     ES:BX = first help string, ES:CX = second help string
+   201                              <2> ; OUT: AX = number (starts from 1) of entry selected; carry set if Esc pressed
+   202                              <2> 
+   203                              <2> os_list_dialog equ 32936
+   204                              <2> 
+   205                              <2> ; ------------------------------------------------------------------
+   206                              <2> ; os_list_dialog_ex -- Show a dialog with a list of options
+   207                              <2> ; IN: DS:BX = pointer to setup struct
+   208                              <2> ;       Addr Size Description
+   209                              <2> ;       000h word Pointer to entry display callback (accepts CX as entry ID, prints out result) - valid only if ptr to list is zero
+   210                              <2> ;       002h word Pointer to comma-separated list of strings to show (zero-terminated)
+   211                              <2> ;       004h word Pointer to key/entry change callback (accepts AX as entry ID, CX as keypress),
+   212                              <2> ;       006h word Number of entries (if 0, then it is automatically calculated from 002h)
+   213                              <2> ;       008h word Pointer to first help string (if 0, then the list will fill the whole dialog)
+   214                              <2> ;       00Ah word Pointer to second help string
+   215                              <2> ;       00Ch word (ES) Pointer to history data (points to a 5 byte array)
+   216                              <2> ;       00Eh byte Screen X position
+   217                              <2> ;       00Fh byte Screen Y position
+   218                              <2> ;       010h byte Dialog width
+   219                              <2> ;       011h byte Dialog height
+   220                              <2> ;       012h word Source segment (used for comma-separated list & help strings)
+   221                              <2> ; OUT: AX = number (starts from 1) of entry selected; carry set if Esc pressed
+   222                              <2> 
+   223                              <2> os_list_dialog_ex equ 33113
+   224                              <2> 
+   225                              <2> ; ------------------------------------------------------------------
+   226                              <2> ; os_select_list -- Draws a list of entries (defined by a callback) to select from.
+   227                              <2> ; IN: AX = width/height, BL = color, CX = number of entries, DX = X/Y pos,
+   228                              <2> ;     SI = callback (if C clear = accepts an entry ID in CX, prints an appropriate string,
+   229                              <2> ;     if C set = accepts key input in AX, entry ID in CX; not required to preserve regs),
+   230                              <2> ;     ES:DI = pointer to a history struct (word .num_of_entries, word .skip_num, byte .cursor) or 0 if none
+   231                              <2> ; OUT: AX = number (starts from 1) of entry selected; carry set if Esc pressed
+   232                              <2> 
+   233                              <2> os_select_list equ 33110
+   234                              <2> 
+   235                              <2> ; ------------------------------------------------------------------
+   236                              <2> ; os_draw_background -- Clear screen with white top and bottom bars
+   237                              <2> ; containing text, and a coloured middle section.
+   238                              <2> ; IN: DS:AX/BX = top/bottom string locations, CX = colour (256 if the app wants to display the default background)
+   239                              <2> ; OUT: None, registers preserved
+   240                              <2> 
+   241                              <2> os_draw_background equ 32807
+   242                              <2> 
+   243                              <2> ; ------------------------------------------------------------------
+   244                              <2> ; os_print_newline -- Reset cursor to start of next line
+   245                              <2> ; IN/OUT: None, registers preserved
+   246                              <2> 
+   247                              <2> os_print_newline equ 32783
+   248                              <2> 
+   249                              <2> ; ------------------------------------------------------------------
+   250                              <2> ; os_dump_registers -- Dumps all register contents in hex to the screen
+   251                              <2> ; IN: All registers
+   252                              <2> ; OUT: None, registers preserved
+   253                              <2> 
+   254                              <2> os_dump_registers equ 32909
+   255                              <2> 
+   256                              <2> ; ------------------------------------------------------------------
+   257                              <2> ; os_input_dialog -- Get text string from user via a dialog box
+   258                              <2> ; IN: ES:AX = string location, DS:BX = message to show
+   259                              <2> ; OUT: None, registers preserved
+   260                              <2> 
+   261                              <2> os_input_dialog equ 32933
+   262                              <2> 
+   263                              <2> ; ------------------------------------------------------------------
+   264                              <2> ; os_password_dialog -- Get a password from user via a dialog box
+   265                              <2> ; IN: ES:AX = string location, DS:BX = message to show
+   266                              <2> ; OUT: None, registers preserved
+   267                              <2> 
+   268                              <2> os_password_dialog equ 33041
+   269                              <2> 
+   270                              <2> ; ------------------------------------------------------------------
+   271                              <2> ; os_dialog_box -- Print dialog box in middle of screen, with button(s)
+   272                              <2> ; IN: DS:AX, DS:BX, DS:CX = string locations (set registers to 0 for no display),
+   273                              <2> ; IN: DX = 0 for single 'OK' dialog,
+   274                              <2> ;          1 for two-button 'OK' and 'Cancel' ('OK' selected by default),
+   275                              <2> ;          2 for two-button 'OK' and 'Cancel' ('Cancel' selected by default)
+   276                              <2> ; OUT: If two-button mode, AX = 0 for OK and 1 for cancel
+   277                              <2> ; NOTE: Each string is limited to 40 characters
+   278                              <2> 
+   279                              <2> os_dialog_box equ 32825
+   280                              <2> 
+   281                              <2> ; ------------------------------------------------------------------
+   282                              <2> ; os_print_space -- Print a space to the screen
+   283                              <2> ; IN/OUT: None, registers preserved
+   284                              <2> 
+   285                              <2> os_print_space equ 32873
+   286                              <2> 
+   287                              <2> ; ------------------------------------------------------------------
+   288                              <2> ; os_print_digit -- Displays contents of AX as a single digit
+   289                              <2> ; Works up to base 37, ie digits 0-Z
+   290                              <2> ; IN: AX = "digit" to format and print
+   291                              <2> ; OUT: None, registers preserved
+   292                              <2> 
+   293                              <2> os_print_digit equ 32879
+   294                              <2> 
+   295                              <2> ; ------------------------------------------------------------------
+   296                              <2> ; os_print_1hex -- Displays low nibble of AL in hex format
+   297                              <2> ; IN: AL = number to format and print
+   298                              <2> ; OUT: None, registers preserved
+   299                              <2> 
+   300                              <2> os_print_1hex equ 32882
+   301                              <2> 
+   302                              <2> ; ------------------------------------------------------------------
+   303                              <2> ; os_print_2hex -- Displays AL in hex format
+   304                              <2> ; IN: AL = number to format and print
+   305                              <2> ; OUT: None, registers preserved
+   306                              <2> 
+   307                              <2> os_print_2hex equ 32885
+   308                              <2> 
+   309                              <2> ; ------------------------------------------------------------------
+   310                              <2> ; os_print_4hex -- Displays AX in hex format
+   311                              <2> ; IN: AX = number to format and print
+   312                              <2> ; OUT: None, registers preserved
+   313                              <2> 
+   314                              <2> os_print_4hex equ 32888
+   315                              <2> 
+   316                              <2> ; ------------------------------------------------------------------
+   317                              <2> ; os_print_8hex - Displays EAX in hex format
+   318                              <2> ; IN: EAX = unsigned integer
+   319                              <2> ; OUT: None, registers preserved
+   320                              <2> 
+   321                              <2> os_print_8hex equ 33065
+   322                              <2> 
+   323                              <2> ; ------------------------------------------------------------------
+   324                              <2> ; os_print_int -- Prints an integer in decimal.
+   325                              <2> ; IN: AX = unsigned integer
+   326                              <2> ; OUT: None, registers preserved
+   327                              <2> 
+   328                              <2> os_print_int equ 33101
+   329                              <2> 
+   330                              <2> ; ------------------------------------------------------------------
+   331                              <2> ; os_print_32int -- Prints a 32 bit integer in decimal.
+   332                              <2> ; IN: EAX = unsigned integer
+   333                              <2> ; OUT: None, registers preserved
+   334                              <2> 
+   335                              <2> os_print_32int equ 32951
+   336                              <2> 
+   337                              <2> ; ------------------------------------------------------------------
+   338                              <2> ; os_input_string -- Take string from keyboard entry
+   339                              <2> ; IN: ES:AX = location of string
+   340                              <2> ; OUT: None, registers preserved
+   341                              <2> 
+   342                              <2> os_input_string equ 32819
+   343                              <2> 
+   344                              <2> ; ------------------------------------------------------------------
+   345                              <2> ; os_input_password -- Take password from keyboard entry
+   346                              <2> ; IN: ES:AX = location of string
+   347                              <2> ; OUT: None, registers preserved
+   348                              <2> 
+   349                              <2> os_input_password equ 33077
+   350                              <2> 
+   351                              <2> ; ------------------------------------------------------------------
+   352                              <2> ; os_set_max_input_length -- Set the maximum length for the next string input
+   353                              <2> ; IN: AL = maximum number of characters
+   354                              <2> ; OUT: None, registers preserved
+   355                              <2> 
+   356                              <2> os_set_max_input_length equ 33131
+   357                              <2> 
+   358                              <2> ; ------------------------------------------------------------------
+   359                              <2> ; os_input_string_ex -- Take string from keyboard entry
+   360                              <2> ; IN: ES:AX = location of string, CH = 0 if normal input, 1 if password input,
+   361                              <2> ;     DS:SI = callback on keys where AL = 0 (input: AX = keypress)
+   362                              <2> ; OUT: None, registers preserved
+   363                              <2> 
+   364                              <2> os_input_string_ex equ 33119
+   365                              <2> 
+   366                              <2> ; ------------------------------------------------------------------
+   367                              <2> ; os_color_selector - Pops up a color selector.
+   368                              <2> ; IN: None
+   369                              <2> ; OUT: color number (0-15)
+   370                              <2> 
+   371                              <2> os_color_selector equ 33053
+   372                              <2> 
+   373                              <2> ; ------------------------------------------------------------------
+   374                              <2> ; os_temp_box -- Draws a dialog box with up to 5 lines of text.
+   375                              <2> ; IN: DS:SI/AX/BX/CX/DX = string locations (or 0 for no display)
+   376                              <2> ; OUT: None, registers preserved
+   377                              <2> 
+   378                              <2> os_temp_box equ 33086
+   379                              <2> 
+   380                              <2> ; ------------------------------------------------------------------
+   381                              <2> ; os_reset_font -- Resets the font to the selected default.
+   382                              <2> ; IN/OUT = None, registers preserved
+   383                              <2> 
+   384                              <2> os_reset_font equ 32990
+   385                              <2> 
+   386                              <2> ; ------------------------------------------------------------------
+   387                              <2> ; os_draw_logo -- Draws the MichalOS logo.
+   388                              <2> ; IN: None
+   389                              <2> ; OUT: A very beautiful logo :-)
+   390                              <2> 
+   391                              <2> os_draw_logo equ 32852
+   392                              <2> 
+   393                              <2> ; ------------------------------------------------------------------
+   394                              <2> ; os_draw_icon -- Draws an icon (in the MichalOS format).
+   395                              <2> ; IN: DS:SI = address of the icon
+   396                              <2> ; OUT: None, registers preserved
+   397                              <2> 
+   398                              <2> os_draw_icon equ 33023
+   399                              <2> 
+   400                              <2> ; ------------------------------------------------------------------
+   401                              <2> ; os_option_menu -- Show a menu with a list of options
+   402                              <2> ; IN: AX = comma-separated list of strings to show (zero-terminated)
+   403                              <2> ; OUT: AX = number (starts from 1) of entry selected; carry set if Esc, left or right pressed
+   404                              <2> 
+   405                              <2> os_option_menu equ 32876
+   406                              <2> 
+   407                              <2> ; ==================================================================
+   408                              <2> ; MichalOS Graphics functions
+   409                              <2> ; Some graphics routines have been borrowed from TachyonOS
+   410                              <2> ; ==================================================================
+   411                              <2> 
+   412                              <2> ; ------------------------------------------------------------------
+   413                              <2> ; os_init_graphics_mode -- Initializes graphics mode.
+   414                              <2> ; IN/OUT: None, registers preserved
+   415                              <2> 
+   416                              <2> os_init_graphics_mode equ 33020
+   417                              <2> 
+   418                              <2> ; ------------------------------------------------------------------
+   419                              <2> ; os_init_text_mode -- Deinitializes graphics mode.
+   420                              <2> ; IN/OUT: None, registers preserved
+   421                              <2> 
+   422                              <2> os_init_text_mode equ 33095
+   423                              <2> 
+   424                              <2> ; ------------------------------------------------------------------
+   425                              <2> ; os_set_pixel -- Sets a pixel on the screen to a given value.
+   426                              <2> ; IN: ES = destination memory segment, CX = X coordinate, AX = Y coordinate, BL = color
+   427                              <2> ; OUT: None, registers preserved
+   428                              <2> 
+   429                              <2> os_set_pixel equ 33017
+   430                              <2> 
+   431                              <2> ; ------------------------------------------------------------------
+   432                              <2> ; os_draw_line -- Draws a line with the Bresenham's line algorithm.
+   433                              <2> ; Translated from an implementation in C (http://www.edepot.com/linebresenham.html)
+   434                              <2> ; IN: ES = destination memory segment, CX=X1, DX=Y1, SI=X2, DI=Y2, BL=colour
+   435                              <2> ; OUT: None, registers preserved
+   436                              <2> 
+   437                              <2> os_draw_line equ 32999
+   438                              <2> 
+   439                              <2> ; ------------------------------------------------------------------
+   440                              <2> ; os_draw_rectangle -- Draws a rectangle.
+   441                              <2> ; IN: ES = destination memory segment, CX=X1, DX=Y1, SI=X2, DI=Y2, BL=colour, CF = set if filled or clear if not
+   442                              <2> ; OUT: None, registers preserved
+   443                              <2> 
+   444                              <2> os_draw_rectangle equ 33047
+   445                              <2> 
+   446                              <2> ; ------------------------------------------------------------------
+   447                              <2> ; os_draw_polygon -- Draws a freeform shape.
+   448                              <2> ; IN: ES = destination memory segment, BH = number of points, BL = colour, SI = location of shape points data
+   449                              <2> ; OUT: None, registers preserved
+   450                              <2> ; DATA FORMAT: x1, y1, x2, y2, x3, y3, etc
+   451                              <2> 
+   452                              <2> os_draw_polygon equ 33002
+   453                              <2> 
+   454                              <2> ; ------------------------------------------------------------------
+   455                              <2> ; os_clear_graphics -- Clears the graphics screen with a given color.
+   456                              <2> ; IN: ES = destination memory segment, BL = colour to set
+   457                              <2> ; OUT: None, registers preserved
+   458                              <2> 
+   459                              <2> os_clear_graphics equ 33008
+   460                              <2> 
+   461                              <2> ; ----------------------------------------
+   462                              <2> ; os_draw_circle -- draw a circular shape
+   463                              <2> ; IN: ES = destination memory segment, AL = colour, BX = radius, CX = middle X, DX = middle y
+   464                              <2> ; OUT: None, registers preserved
+   465                              <2> 
+   466                              <2> os_draw_circle equ 33005
+   467                              <2> 
+   468                              <2> ; ==================================================================
+   469                              <2> ; MichalOS Keyboard input handling functions
+   470                              <2> ; ==================================================================
+   471                              <2> 
+   472                              <2> ; ------------------------------------------------------------------
+   473                              <2> ; os_wait_for_key -- Waits for keypress and returns key
+   474                              <2> ; Also handles the screensaver. TODO: move the screensaver code to "int.asm"
+   475                              <2> ; IN: None
+   476                              <2> ; OUT: AX = key pressed, other regs preserved
+   477                              <2> 
+   478                              <2> os_wait_for_key equ 32786
+   479                              <2> 
+   480                              <2> ; ------------------------------------------------------------------
+   481                              <2> ; os_check_for_key -- Scans keyboard buffer for input, but doesn't wait
+   482                              <2> ; Also handles special keyboard shortcuts.
+   483                              <2> ; IN: None
+   484                              <2> ; OUT: AX = 0 if no key pressed, otherwise scan code
+   485                              <2> 
+   486                              <2> os_check_for_key equ 32789
+   487                              <2> 
+   488                              <2> ; ==================================================================
+   489                              <2> ; MichalOS Port I/O functions
+   490                              <2> ; ==================================================================
+   491                              <2> 
+   492                              <2> ; ------------------------------------------------------------------
+   493                              <2> ; os_serial_port_enable -- Set up the serial port for transmitting data
+   494                              <2> ; IN: AX = 0 for normal mode (9600 baud), or 1 for slow mode (1200 baud)
+   495                              <2> ; OUT: None, registers preserved
+   496                              <2> 
+   497                              <2> os_serial_port_enable equ 32954
+   498                              <2> 
+   499                              <2> ; ------------------------------------------------------------------
+   500                              <2> ; os_send_via_serial -- Send a byte via the serial port
+   501                              <2> ; IN: AL = byte to send via serial
+   502                              <2> ; OUT: AH = Bit 7 clear on success
+   503                              <2> 
+   504                              <2> os_send_via_serial equ 32861
+   505                              <2> 
+   506                              <2> ; ------------------------------------------------------------------
+   507                              <2> ; os_get_via_serial -- Get a byte from the serial port
+   508                              <2> ; IN: None
+   509                              <2> ; OUT: AL = byte that was received, AH = Bit 7 clear on success
+   510                              <2> 
+   511                              <2> os_get_via_serial equ 32864
+   512                              <2> 
+   513                              <2> ; ==================================================================
+   514                              <2> ; MichalOS Disk access functions
+   515                              <2> ; ==================================================================
+   516                              <2> 
+   517                              <2> ; ------------------------------------------------------------------
+   518                              <2> ; os_report_free_space -- Returns the amount of free space on disk
+   519                              <2> ; IN: None
+   520                              <2> ; OUT: AX = Number of sectors free
+   521                              <2> 
+   522                              <2> os_report_free_space equ 32894
+   523                              <2> 
+   524                              <2> ; ------------------------------------------------------------------
+   525                              <2> ; os_get_file_list -- Generate comma-separated string of files on floppy
+   526                              <2> ; IN/OUT: AX = location to store zero-terminated filename string
+   527                              <2> 
+   528                              <2> os_get_file_list equ 32831
+   529                              <2> 
+   530                              <2> ; ------------------------------------------------------------------
+   531                              <2> ; os_load_file -- Load a file into RAM
+   532                              <2> ; IN: AX = location of filename, ES:CX = location in RAM to load file
+   533                              <2> ; OUT: BX = file size (in bytes), carry set if file not found
+   534                              <2> 
+   535                              <2> os_load_file equ 32801
+   536                              <2> 
+   537                              <2> ; --------------------------------------------------------------------------
+   538                              <2> ; os_write_file -- Save (max 64K) file to disk
+   539                              <2> ; IN: AX = filename, ES:BX = data location, CX = bytes to write
+   540                              <2> ; OUT: Carry clear if OK, set if failure
+   541                              <2> 
+   542                              <2> os_write_file equ 32915
+   543                              <2> 
+   544                              <2> ; --------------------------------------------------------------------------
+   545                              <2> ; os_file_exists -- Check for presence of file on the floppy
+   546                              <2> ; IN: AX = filename location; OUT: carry clear if found, set if not
+   547                              <2> 
+   548                              <2> os_file_exists equ 32918
+   549                              <2> 
+   550                              <2> ; --------------------------------------------------------------------------
+   551                              <2> ; os_create_file -- Creates a new 0-byte file on the floppy disk
+   552                              <2> ; IN: AX = location of filename
+   553                              <2> ; OUT: None, registers preserved
+   554                              <2> 
+   555                              <2> os_create_file equ 32921
+   556                              <2> 
+   557                              <2> ; --------------------------------------------------------------------------
+   558                              <2> ; os_remove_file -- Deletes the specified file from the filesystem
+   559                              <2> ; IN: AX = location of filename to remove
+   560                              <2> 
+   561                              <2> os_remove_file equ 32924
+   562                              <2> 
+   563                              <2> ; --------------------------------------------------------------------------
+   564                              <2> ; os_rename_file -- Change the name of a file on the disk
+   565                              <2> ; IN: AX = filename to change, BX = new filename (zero-terminated strings)
+   566                              <2> ; OUT: carry set on error
+   567                              <2> 
+   568                              <2> os_rename_file equ 32927
+   569                              <2> 
+   570                              <2> ; --------------------------------------------------------------------------
+   571                              <2> ; os_get_file_size -- Get file size information for specified file
+   572                              <2> ; IN: AX = filename; OUT: EBX = file size in bytes (up to 4GB)
+   573                              <2> ; or carry set if file not found
+   574                              <2> 
+   575                              <2> os_get_file_size equ 32930
+   576                              <2> 
+   577                              <2> ; --------------------------------------------------------------------------
+   578                              <2> ; os_get_file_datetime -- Get file write time/date information for specified file
+   579                              <2> ; IN: AX = filename; OUT: BX = time of creation (HHHHHMMMMMMSSSSS), CX = date of creation (YYYYYYYMMMMDDDDD)
+   580                              <2> ; or carry set if file not found
+   581                              <2> 
+   582                              <2> os_get_file_datetime equ 33011
+   583                              <2> 
+   584                              <2> ; --------------------------------------------------------------------------
+   585                              <2> ; os_get_boot_disk -- Returns the boot disk number.
+   586                              <2> ; IN: None
+   587                              <2> ; OUT: DL = boot disk number for use in INT 13h calls
+   588                              <2> 
+   589                              <2> os_get_boot_disk equ 33062
+   590                              <2> 
+   591                              <2> ; ==================================================================
+   592                              <2> ; MichalOS Miscellaneous functions
+   593                              <2> ; ==================================================================
+   594                              <2> 
+   595                              <2> ; ------------------------------------------------------------------
+   596                              <2> ; os_read_config_byte -- Reads a byte from the config
+   597                              <2> ; IN: BX = offset
+   598                              <2> ; OUT: AL = value
+   599                              <2> 
+   600                              <2> os_read_config_byte equ 33134
+   601                              <2> 
+   602                              <2> ; ------------------------------------------------------------------
+   603                              <2> ; os_read_config_word -- Reads a word from the config
+   604                              <2> ; IN: BX = offset
+   605                              <2> ; OUT: AX = value
+   606                              <2> 
+   607                              <2> os_read_config_word equ 33137
+   608                              <2> 
+   609                              <2> ; ------------------------------------------------------------------
+   610                              <2> ; os_write_config_byte -- Writes a byte to the config
+   611                              <2> ; NOTE: This will only affect the config in memory,
+   612                              <2> ; run os_save_config to save the changes to disk!
+   613                              <2> ; IN: BX = offset, AL = value
+   614                              <2> ; OUT: None, registers preserved
+   615                              <2> 
+   616                              <2> os_write_config_byte equ 33140
+   617                              <2> 
+   618                              <2> ; ------------------------------------------------------------------
+   619                              <2> ; os_write_config_word -- Writes a byte to the config
+   620                              <2> ; NOTE: This will only affect the config in memory,
+   621                              <2> ; run os_save_config to save the changes to disk!
+   622                              <2> ; IN: BX = offset, AX = value
+   623                              <2> ; OUT: None, registers preserved
+   624                              <2> 
+   625                              <2> os_write_config_word equ 33143
+   626                              <2> 
+   627                              <2> ; ------------------------------------------------------------------
+   628                              <2> ; os_save_config -- Saves the current config to disk
+   629                              <2> ; OUT: Carry set if error
+   630                              <2> 
+   631                              <2> os_save_config equ 33146
+   632                              <2> 
+   633                              <2> ; ------------------------------------------------------------------
+   634                              <2> ; os_exit -- Exits the application, launches another one (if possible)
+   635                              <2> ; IN: AX = if not 0, then ptr to filename of application to be launched,
+   636                              <2> ;     BX = 1 if the application calling os_exit should be re-launched after
+   637                              <2> ;     the requested application exits
+   638                              <2> ; OUT: None, register preserved
+   639                              <2> 
+   640                              <2> os_exit equ 32780
+   641                              <2> 
+   642                              <2> ; ------------------------------------------------------------------
+   643                              <2> ; os_clear_registers -- Clear all registers
+   644                              <2> ; IN: None
+   645                              <2> ; OUT: Cleared registers
+   646                              <2> 
+   647                              <2> os_clear_registers equ 32975
+   648                              <2> 
+   649                              <2> ; ------------------------------------------------------------------
+   650                              <2> ; os_get_os_name -- Get the OS name string
+   651                              <2> ; IN: None
+   652                              <2> ; OUT: DS:SI = OS name string, zero-terminated
+   653                              <2> 
+   654                              <2> os_get_os_name equ 33083
+   655                              <2> 
+   656                              <2> ; ------------------------------------------------------------------
+   657                              <2> ; os_get_memory -- Gets the amount of system RAM.
+   658                              <2> ; IN: None
+   659                              <2> ; OUT: AX = conventional memory (in kB), BX = high memory (in kB)
+   660                              <2> 
+   661                              <2> os_get_memory equ 33050
+   662                              <2> 
+   663                              <2> ; ------------------------------------------------------------------
+   664                              <2> ; os_int_1Ah -- Middle-man between the INT 1Ah call and the kernel/apps (used for timezones).
+   665                              <2> ; IN/OUT: same as int 1Ah
+   666                              <2> 
+   667                              <2> os_int_1Ah equ 33032
+   668                              <2> 
+   669                              <2> ; ==================================================================
+   670                              <2> ; MichalOS/MikeOS 4.5 BASIC interpreter
+   671                              <2> ; ==================================================================
+   672                              <2> 
+   673                              <2> ; ------------------------------------------------------------------
+   674                              <2> ; The BASIC interpreter execution starts here -- a parameter string
+   675                              <2> ; is passed in SI and copied into the first string, unless SI = 0
+   676                              <2> 
+   677                              <2> os_run_basic equ 32963
+   678                              <2> 
+   679                              <2> ; ==================================================================
+   680                              <2> ; MichalOS Math functions
+   681                              <2> ; ==================================================================
+   682                              <2> 
+   683                              <2> ; ------------------------------------------------------------------
+   684                              <2> ; os_get_random -- Return a random integer between low and high (inclusive)
+   685                              <2> ; IN: AX = low integer, BX = high integer
+   686                              <2> ; OUT: CX = random integer
+   687                              <2> 
+   688                              <2> os_get_random equ 32948
+   689                              <2> 
+   690                              <2> ; ------------------------------------------------------------------
+   691                              <2> ; os_bcd_to_int -- Converts a binary coded decimal number to an integer
+   692                              <2> ; IN: AL = BCD number
+   693                              <2> ; OUT: AX = integer value
+   694                              <2> 
+   695                              <2> os_bcd_to_int equ 32846
+   696                              <2> 
+   697                              <2> ; ------------------------------------------------------------------
+   698                              <2> ; os_int_to_bcd -- Converts an integer to a binary coded decimal number
+   699                              <2> ; IN: AL = integer value
+   700                              <2> ; OUT: AL = BCD number
+   701                              <2> 
+   702                              <2> os_int_to_bcd equ 33035
+   703                              <2> 
+   704                              <2> ; ------------------------------------------------------------------
+   705                              <2> ; os_math_power -- Calculates EAX^EBX.
+   706                              <2> ; IN: EAX^EBX = input
+   707                              <2> ; OUT: EAX = result
+   708                              <2> 
+   709                              <2> os_math_power equ 33071
+   710                              <2> 
+   711                              <2> ; ------------------------------------------------------------------
+   712                              <2> ; os_math_root -- Approximates the EBXth root of EAX.
+   713                              <2> ; IN: EAX = input, EBX = root
+   714                              <2> ; OUT: EAX(EDX = 0) = result; EAX to EDX = range
+   715                              <2> 
+   716                              <2> os_math_root equ 33074
+   717                              <2> 
+   718                              <2> ; ==================================================================
+   719                              <2> ; MichalOS String manipulation functions
+   720                              <2> ; ==================================================================
+   721                              <2> 
+   722                              <2> ; ------------------------------------------------------------------
+   723                              <2> ; os_string_encrypt -- Encrypts a string using a totally military-grade encryption algorithm
+   724                              <2> ; IN: DS:SI = Input string/Output string
+   725                              <2> ; OUT: None, registers preserved
+   726                              <2> 
+   727                              <2> os_string_encrypt equ 33014
+   728                              <2> 
+   729                              <2> ; ------------------------------------------------------------------
+   730                              <2> ; os_string_add -- Add a string on top of another string
+   731                              <2> ; IN: DS:AX = Main string, DS:BX = Added string
+   732                              <2> ; OUT: None, registers preserved
+   733                              <2> 
+   734                              <2> os_string_add equ 32897
+   735                              <2> 
+   736                              <2> ; ------------------------------------------------------------------
+   737                              <2> ; os_string_length -- Return length of a string
+   738                              <2> ; IN: DS:AX = string location
+   739                              <2> ; OUT AX = length (other regs preserved)
+   740                              <2> 
+   741                              <2> os_string_length equ 32810
+   742                              <2> 
+   743                              <2> ; ------------------------------------------------------------------
+   744                              <2> ; os_string_reverse -- Reverse the characters in a string
+   745                              <2> ; IN: DS:SI = string location
+   746                              <2> ; OUT: None, registers preserved
+   747                              <2> 
+   748                              <2> os_string_reverse equ 32939
+   749                              <2> 
+   750                              <2> ; ------------------------------------------------------------------
+   751                              <2> ; os_find_char_in_string -- Find location of character in a string
+   752                              <2> ; IN: DS:SI = string location, AL = character to find
+   753                              <2> ; OUT: AX = location in string, or 0 if char not present
+   754                              <2> 
+   755                              <2> os_find_char_in_string equ 32867
+   756                              <2> 
+   757                              <2> ; ------------------------------------------------------------------
+   758                              <2> ; os_string_uppercase -- Convert zero-terminated string to upper case
+   759                              <2> ; IN: DS:AX = string location
+   760                              <2> ; OUT: None, registers preserved
+   761                              <2> 
+   762                              <2> os_string_uppercase equ 32813
+   763                              <2> 
+   764                              <2> ; ------------------------------------------------------------------
+   765                              <2> ; os_string_lowercase -- Convert zero-terminated string to lower case
+   766                              <2> ; IN: DS:AX = string location
+   767                              <2> ; OUT: None, registers preserved
+   768                              <2> 
+   769                              <2> os_string_lowercase equ 32816
+   770                              <2> 
+   771                              <2> ; ------------------------------------------------------------------
+   772                              <2> ; os_string_copy -- Copy one string into another
+   773                              <2> ; IN: DS:SI = source, ES:DI = destination (programmer ensure sufficient room)
+   774                              <2> ; OUT: None, registers preserved
+   775                              <2> 
+   776                              <2> os_string_copy equ 32822
+   777                              <2> 
+   778                              <2> ; ------------------------------------------------------------------
+   779                              <2> ; os_string_join -- Join two strings into a third string
+   780                              <2> ; IN: DS:AX = string one, DS:BX = string two, ES:CX = destination string
+   781                              <2> ; OUT: None, registers preserved
+   782                              <2> 
+   783                              <2> os_string_join equ 32828
+   784                              <2> 
+   785                              <2> ; ------------------------------------------------------------------
+   786                              <2> ; os_string_chomp -- Strip leading and trailing spaces from a string
+   787                              <2> ; IN: DS:AX = string location
+   788                              <2> ; OUT: None, registers preserved
+   789                              <2> 
+   790                              <2> os_string_chomp equ 32837
+   791                              <2> 
+   792                              <2> ; ------------------------------------------------------------------
+   793                              <2> ; os_string_compare -- See if two strings match
+   794                              <2> ; IN: DS:SI = string one, DS:DI = string two
+   795                              <2> ; OUT: carry set if same, clear if different
+   796                              <2> 
+   797                              <2> os_string_compare equ 32834
+   798                              <2> 
+   799                              <2> ; ------------------------------------------------------------------
+   800                              <2> ; os_string_parse -- Take string (eg "run foo bar baz") and return
+   801                              <2> ; pointers to zero-terminated strings (eg AX = "run", BX = "foo" etc.)
+   802                              <2> ; IN: DS:SI = string
+   803                              <2> ; OUT: AX, BX, CX, DX = individual strings
+   804                              <2> 
+   805                              <2> os_string_parse equ 32960
+   806                              <2> 
+   807                              <2> ; ------------------------------------------------------------------
+   808                              <2> ; os_string_to_int -- Convert decimal string to integer value
+   809                              <2> ; IN: DS:SI = string location (max 5 chars, up to '65535')
+   810                              <2> ; OUT: AX = number
+   811                              <2> 
+   812                              <2> os_string_to_int equ 32942
+   813                              <2> 
+   814                              <2> ; ------------------------------------------------------------------
+   815                              <2> ; os_string_to_hex -- Convert hexadecimal string to integer value
+   816                              <2> ; IN: DS:SI = string location (max 8 chars, up to 'FFFFFFFF')
+   817                              <2> ; OUT: EAX = number
+   818                              <2> 
+   819                              <2> os_string_to_hex equ 32840
+   820                              <2> 
+   821                              <2> ; ------------------------------------------------------------------
+   822                              <2> ; os_int_to_string -- Convert unsigned integer to string
+   823                              <2> ; IN: AX = unsigned int
+   824                              <2> ; OUT: DS:AX = string location
+   825                              <2> 
+   826                              <2> os_int_to_string equ 32792
+   827                              <2> 
+   828                              <2> ; ------------------------------------------------------------------
+   829                              <2> ; os_sint_to_string -- Convert signed integer to string
+   830                              <2> ; IN: AX = signed int
+   831                              <2> ; OUT: DS:AX = string location
+   832                              <2> 
+   833                              <2> os_sint_to_string equ 32957
+   834                              <2> 
+   835                              <2> ; ------------------------------------------------------------------
+   836                              <2> ; os_get_time_string -- Get current time in a string (eg '10:25')
+   837                              <2> ; IN: ES:BX = string location
+   838                              <2> ; OUT: None, registers preserved
+   839                              <2> 
+   840                              <2> os_get_time_string equ 32849
+   841                              <2> 
+   842                              <2> ; ------------------------------------------------------------------
+   843                              <2> ; os_get_date_string -- Get current date in a string (eg '12/31/2007')
+   844                              <2> ; IN: ES:BX = string location
+   845                              <2> ; OUT: None, registers preserved
+   846                              <2> 
+   847                              <2> os_get_date_string equ 32858
+   848                              <2> 
+   849                              <2> ; ------------------------------------------------------------------
+   850                              <2> ; os_string_tokenize -- Reads tokens separated by specified char from
+   851                              <2> ; a string. Returns pointer to next token, or 0 if none left
+   852                              <2> ; IN: AL = separator char, DS:SI = beginning
+   853                              <2> ; OUT: DI = next token or 0 if none
+   854                              <2> 
+   855                              <2> os_string_tokenize equ 32972
+   856                              <2> 
+   857                              <2> ; ------------------------------------------------------------------
+   858                              <2> ; os_string_callback_tokenizer -- Prints a token from string, requests are done by callback
+   859                              <2> ; IN: DS:AX = comma-separated string
+   860                              <2> ; OUT: AL = AH = max length of any token, CX = number of entries in the list,
+   861                              <2> ;      DX:SI = callback location (if C clear, accepts CX as entry ID, prints out result)
+   862                              <2> 
+   863                              <2> os_string_callback_tokenizer equ 33128
+   864                              <2> 
+   865                              <2> ; ------------------------------------------------------------------
+   866                              <2> ; os_32int_to_string -- Converts an unsigned 32-bit integer into a string
+   867                              <2> ; IN: EAX = unsigned int
+   868                              <2> ; OUT: DS:AX = string location
+   869                              <2> 
+   870                              <2> os_32int_to_string equ 33059
+   871                              <2> 
+   872                              <2> ; ------------------------------------------------------------------
+   873                              <2> ; os_string_to_32int -- Converts a string into a 32-bit integer
+   874                              <2> ; IN: DS:SI = string location
+   875                              <2> ; OUT: EAX = unsigned integer
+   876                              <2> 
+   877                              <2> os_string_to_32int equ 33068
+   878                              <2> 
+   879                              <2> ; ==================================================================
+   880                              <2> ; MichalOS ZX7 decompression routine
+   881                              <2> ; ==================================================================
+   882                              <2> 
+   883                              <2> ; ------------------------------------------------------------------
+   884                              <2> ; os_decompress_zx7 -- Decompresses ZX7-packed data.
+   885                              <2> ; IN: DS:SI = source, ES:DI = destination
+   886                              <2> ; OUT: None, registers preserved
+   887                              <2> 
+   888                              <2> os_decompress_zx7 equ 33038
+   889                              <2> 
+   890                              <2> ; ==================================================================
+   891                              <2> ; MichalOS Interrupt management & app timer functions
+   892                              <2> ; ==================================================================
+   893                              <2> 
+   894                              <2> ; -----------------------------------------------------------------
+   895                              <2> ; os_modify_int_handler -- Change location of interrupt handler
+   896                              <2> ; IN: CL = int number, DI:SI = handler location
+   897                              <2> ; OUT: None, registers preserved
+   898                              <2> 
+   899                              <2> os_modify_int_handler equ 33056
+   900                              <2> 
+   901                              <2> ; -----------------------------------------------------------------
+   902                              <2> ; os_get_int_handler -- Change location of interrupt handler
+   903                              <2> ; IN: CL = int number
+   904                              <2> ; OUT: DI:SI = handler location
+   905                              <2> 
+   906                              <2> os_get_int_handler equ 33080
+   907                              <2> 
+   908                              <2> ; ------------------------------------------------------------------
+   909                              <2> ; os_pause -- Delay execution for a specified number of ticks (18.2 Hz by default)
+   910                              <2> ; IN: AX = amount of ticks to wait
+   911                              <2> ; OUT: None, registers preserved
+   912                              <2> 
+   913                              <2> os_pause equ 32804
+   914                              <2> 
+   915                              <2> ; -----------------------------------------------------------------
+   916                              <2> ; os_attach_app_timer -- Attach a timer interrupt to an application and sets the timer speed
+   917                              <2> ; Formula: speed = (105000000 / 88) / frequency
+   918                              <2> ; IN: DS:SI = handler location, CX = speed
+   919                              <2> ; OUT: None, registers preserved
+   920                              <2> 
+   921                              <2> os_attach_app_timer equ 32969
+   922                              <2> 
+   923                              <2> ; -----------------------------------------------------------------
+   924                              <2> ; os_return_app_timer -- Returns the timer interrupt back to the system and resets the timer speed
+   925                              <2> ; IN/OUT: None, registers preserved
+   926                              <2> 
+   927                              <2> os_return_app_timer equ 32987
+   928                              <2> 
+   929                              <2> ; -----------------------------------------------------------------
+   930                              <2> ; os_set_timer_speed -- Sets the timer's trigger speed.
+   931                              <2> ; Formula: speed = (105000000 / 88) / frequency
+   932                              <2> ; IN: CX = speed
+   933                              <2> ; OUT: Nothing, registers preserved
+   934                              <2> 
+   935                              <2> os_set_timer_speed equ 32891
+   936                              <2> 
+   937                              <2> ; ==================================================================
+   938                              <2> ; MichalOS Low-level disk driver
+   939                              <2> ; ==================================================================
+   940                              <2> 
+   941                              <2> ; --------------------------------------------------------------------------
+   942                              <2> ; os_disk_read_sector -- Read a single sector from disk
+   943                              <2> ; IN: EAX = sector ID, ES:SI = 512 byte buffer, DL = drive number, OUT: carry set if error
+   944                              <2> 
+   945                              <2> os_disk_read_sector equ 33092
+   946                              <2> 
+   947                              <2> ; --------------------------------------------------------------------------
+   948                              <2> ; os_disk_read_multiple_sectors -- Read multiple sectors from disk
+   949                              <2> ; IN: EAX = sector ID, CX = number of sectors, ES:SI = 512 byte buffer, DL = drive number, OUT: carry set if error
+   950                              <2> 
+   951                              <2> os_disk_read_multiple_sectors equ 33104
+   952                              <2> 
+   953                              <2> ; --------------------------------------------------------------------------
+   954                              <2> ; os_disk_write_sector -- Write a single sector to disk
+   955                              <2> ; IN: EAX = sector ID, ES:SI = 512 byte buffer, DL = drive number, OUT: carry set if error
+   956                              <2> 
+   957                              <2> os_disk_write_sector equ 33098
+   958                              <2> 
+   959                              <2> ; --------------------------------------------------------------------------
+   960                              <2> ; os_disk_write_multiple_sectors -- Write multiple sectors to disk
+   961                              <2> ; IN: EAX = sector ID, CX = number of sectors, ES:SI = 512 byte buffer, DL = drive number, OUT: carry set if error
+   962                              <2> 
+   963                              <2> os_disk_write_multiple_sectors equ 33116
+   964                              <2> 
+    10                              <1> 
+    11                              <1> %macro oscall 1
+    12                              <1> 	mov bp, %1
+    13                              <1> 	int 40h
+    14                              <1> %endmacro
+    15                              <1> 
+    16                              <1> ; -----------------------------------------------------------------
+     6                                  
+     7                                  start:
+     8 00000000 E8(0980)                	call os_clear_screen
+     9                                  	
+    10 00000003 E8(3B81)                	call os_get_os_name
+    11 00000006 E8(0380)                	call os_print_string
+    12 00000009 BE[BB07]                	mov si, version_msg
+    13 0000000C E8(0380)                	call os_print_string
+    14 0000000F BE[C707]                	mov si, help_msg
+    15 00000012 E8(0380)                	call os_print_string
+    16                                  
+    17                                  get_cmd:				; Main processing loop
+    18 00000015 BF000C                  	mov di, 3072			; Clear input buffer each time
+    19                                  	clr al
+    31 00000018 30C0                <1>  xor %1, %1
+    20 0000001A B90001                  	mov cx, 256
+    21 0000001D F3AA                    	rep stosb
+    22                                  
+    23 0000001F BF[9E04]                	mov di, command			; And single command buffer
+    24 00000022 B92000                  	mov cx, 32
+    25 00000025 F3AA                    	rep stosb
+    26                                  
+    27 00000027 BE[FE04]                	mov si, prompt			; Main loop; prompt for input
+    28 0000002A E8(0380)                	call os_print_string
+    29                                  
+    30 0000002D B8000C                  	mov ax, 3072			; Get command string from user
+    31 00000030 E8(3380)                	call os_input_string
+    32                                  
+    33 00000033 E8(0F80)                	call os_print_newline
+    34                                  
+    35 00000036 B8000C                  	mov ax, 3072			; Remove trailing spaces
+    36 00000039 E8(4580)                	call os_string_chomp
+    37                                  
+    38 0000003C BE000C                  	mov si, 3072			; If just enter pressed, prompt again
+    39 0000003F 803C00                  	cmp byte [si], 0
+    40 00000042 74D1                    	je get_cmd
+    41                                  
+    42 00000044 BE000C                  	mov si, 3072			; Separate out the individual command
+    43 00000047 B020                    	mov al, ' '
+    44 00000049 E8(CC80)                	call os_string_tokenize
+    45                                  
+    46 0000004C 893E[CF04]              	mov word [param_list], di	; Store location of full parameters
+    47                                  
+    48 00000050 BE000C                  	mov si, 3072			; Store copy of command for later modifications
+    49 00000053 BF[9E04]                	mov di, command
+    50 00000056 E8(3680)                	call os_string_copy
+    51                                  
+    52                                  	; First, let's check to see if it's an internal command...
+    53                                  
+    54 00000059 B8000C                  	mov ax, 3072
+    55 0000005C E8(2D80)                	call os_string_uppercase
+    56                                  
+    57 0000005F BE000C                  	mov si, 3072
+    58                                  
+    59 00000062 BF[EB07]                	mov di, exit_string		; 'EXIT' entered?
+    60 00000065 E8(4280)                	call os_string_compare
+    61 00000068 0F823104                	jc exit
+    62                                  
+    63 0000006C BF[F007]                	mov di, help_string		; 'HELP' entered?
+    64 0000006F E8(4280)                	call os_string_compare
+    65 00000072 0F823301                	jc print_help
+    66                                  
+    67 00000076 BF[F507]                	mov di, cls_string		; 'CLS' entered?
+    68 00000079 E8(4280)                	call os_string_compare
+    69 0000007C 0F823201                	jc clear_screen
+    70                                  
+    71 00000080 BF[FB07]                	mov di, dir_string		; 'DIR' entered?
+    72 00000083 E8(4280)                	call os_string_compare
+    73 00000086 0F827002                	jc list_directory
+    74                                  
+    75 0000008A BF[1E08]                	mov di, la_string		; 'LA' entered?
+    76 0000008D E8(4280)                	call os_string_compare
+    77 00000090 0F825201                	jc la_directory
+    78                                  
+    79 00000094 BF[0808]                	mov di, ver_string		; 'VER' entered?
+    80 00000097 E8(4280)                	call os_string_compare
+    81 0000009A 0F823C01                	jc print_ver
+    82                                  
+    83 0000009E BF[FE07]                	mov di, time_string		; 'TIME' entered?
+    84 000000A1 E8(4280)                	call os_string_compare
+    85 000000A4 0F821001                	jc print_time
+    86                                  
+    87 000000A8 BF[0308]                	mov di, date_string		; 'DATE' entered?
+    88 000000AB E8(4280)                	call os_string_compare
+    89 000000AE 0F821701                	jc print_date
+    90                                  
+    91 000000B2 BF[0C08]                	mov di, cat_string		; 'CAT' entered?
+    92 000000B5 E8(4280)                	call os_string_compare
+    93 000000B8 0F828102                	jc cat_file
+    94                                  
+    95 000000BC BF[1008]                	mov di, del_string		; 'DEL' entered?
+    96 000000BF E8(4280)                	call os_string_compare
+    97 000000C2 0F82C302                	jc del_file
+    98                                  
+    99 000000C6 BF[1608]                	mov di, copy_string		; 'COPY' entered?
+   100 000000C9 E8(4280)                	call os_string_compare
+   101 000000CC 0F821F03                	jc copy_file
+   102                                  
+   103 000000D0 BF[1308]                	mov di, ren_string		; 'REN' entered?
+   104 000000D3 E8(4280)                	call os_string_compare
+   105 000000D6 0F827303                	jc ren_file
+   106                                  
+   107 000000DA BF[1908]                	mov di, size_string		; 'SIZE' entered?
+   108 000000DD E8(4280)                	call os_string_compare
+   109 000000E0 0F82D002                	jc size_file
+   110                                  
+   111                                  	; If the user hasn't entered any of the above commands, then we
+   112                                  	; need to check for an executable file -- .APP or .BAS, and the
+   113                                  	; user may not have provided the extension
+   114                                  
+   115 000000E4 B8[9E04]                	mov ax, command
+   116 000000E7 E8(2D80)                	call os_string_uppercase
+   117 000000EA E8(2A80)                	call os_string_length
+   118                                  
+   119                                  
+   120                                  	; If the user has entered, say, MEGACOOL.APP, we want to find that .APP
+   121                                  	; bit, so we get the length of the command, go four characters back to
+   122                                  	; the full stop, and start searching from there
+   123                                  
+   124 000000ED BE[9E04]                	mov si, command
+   125 000000F0 01C6                    	add si, ax
+   126                                  
+   127 000000F2 803C00                  	cmp byte [si], 0
+   128 000000F5 7459                    	je no_extension
+   129                                  
+   130 000000F7 83EE04                  	sub si, 4
+   131                                  
+   132 000000FA BF[F404]                	mov di, bin_extension		; Is there a .BIN extension?
+   133 000000FD E8(4280)                	call os_string_compare
+   134 00000100 720B                    	jc execute_bin
+   135                                  
+   136 00000102 BF[F904]                	mov di, bas_extension		; Or is there a .BAS extension?
+   137 00000105 E8(4280)                	call os_string_compare
+   138 00000108 7226                    	jc bas_file
+   139                                  
+   140 0000010A E99300                  	jmp total_fail
+   141                                  	
+   142                                  execute_bin:
+   143 0000010D 8B36[CF04]              	mov word si, [param_list]
+   144 00000111 E8(C080)                	call os_string_parse
+   145 00000114 85C0                    	test ax, ax
+   146 00000116 740D                    	jz .no_parameters
+   147                                  	
+   148 00000118 E8(2D80)                	call os_string_uppercase
+   149                                  	
+   150 0000011B 89C6                    	mov si, ax
+   151 0000011D BFE000                  	mov di, 0E0h
+   152 00000120 E8(3680)                	call os_string_copy
+   153 00000123 EB05                    	jmp .execute
+   154                                  
+   155                                  .no_parameters:
+   156 00000125 C606E00000              	mov byte [0E0h], 0
+   157                                  
+   158                                  .execute:
+   159 0000012A B8[9E04]                	mov ax, command
+   160 0000012D E8(0C80)                	call os_exit
+   161                                  	
+   162                                  bas_file:
+   163 00000130 B8[9E04]                	mov ax, command
+   164                                  	clr bx
+    31 00000133 31DB                <1>  xor %1, %1
+   165 00000135 B90010                  	mov cx, 4096
+   166 00000138 E8(2180)                	call os_load_file
+   167 0000013B 7263                    	jc total_fail
+   168                                  
+   169 0000013D B80010                  	mov ax, 4096
+   170 00000140 8B36[CF04]              	mov word si, [param_list]
+   171 00000144 E8(C380)                	call os_run_basic
+   172                                  
+   173 00000147 E8(0980)                	call os_clear_screen
+   174 0000014A E8(8780)                	call os_show_cursor
+   175                                  	
+   176 0000014D E9C5FE                  	jmp get_cmd
+   177                                  
+   178                                  no_extension:
+   179 00000150 B8[9E04]                	mov ax, command
+   180 00000153 E8(2A80)                	call os_string_length
+   181                                  
+   182 00000156 BE[9E04]                	mov si, command
+   183 00000159 01C6                    	add si, ax
+   184                                  
+   185 0000015B C6042E                  	mov byte [si], '.'
+   186 0000015E C6440141                	mov byte [si+1], 'A'
+   187 00000162 C6440250                	mov byte [si+2], 'P'
+   188 00000166 C6440350                	mov byte [si+3], 'P'
+   189 0000016A C6440400                	mov byte [si+4], 0
+   190                                  
+   191 0000016E B8[9E04]                	mov ax, command
+   192                                  	clr bx
+    31 00000171 31DB                <1>  xor %1, %1
+   193 00000173 B90010                  	mov cx, 4096
+   194 00000176 E8(2180)                	call os_load_file
+   195 00000179 7202                    	jc try_bas_ext
+   196                                  
+   197 0000017B EB90                    	jmp execute_bin
+   198                                  
+   199                                  
+   200                                  try_bas_ext:
+   201 0000017D B8[9E04]                	mov ax, command
+   202 00000180 E8(2A80)                	call os_string_length
+   203                                  
+   204 00000183 BE[9E04]                	mov si, command
+   205 00000186 01C6                    	add si, ax
+   206 00000188 83EE04                  	sub si, 4
+   207                                  
+   208 0000018B C6042E                  	mov byte [si], '.'
+   209 0000018E C6440142                	mov byte [si+1], 'B'
+   210 00000192 C6440241                	mov byte [si+2], 'A'
+   211 00000196 C6440353                	mov byte [si+3], 'S'
+   212 0000019A C6440400                	mov byte [si+4], 0
+   213                                  
+   214 0000019E EB90                    	jmp bas_file
+   215                                  
+   216                                  
+   217                                  
+   218                                  total_fail:
+   219 000001A0 BE[9106]                	mov si, invalid_msg
+   220 000001A3 E8(0380)                	call os_print_string
+   221                                  
+   222 000001A6 E96CFE                  	jmp get_cmd
+   223                                  
+   224                                  ; ------------------------------------------------------------------
+   225                                  
+   226                                  print_help:
+   227 000001A9 BE[0105]                	mov si, dir_help
+   228 000001AC E8(0380)                	call os_print_string
+   229 000001AF E963FE                  	jmp get_cmd
+   230                                  
+   231                                  
+   232                                  ; ------------------------------------------------------------------
+   233                                  
+   234                                  clear_screen:
+   235 000001B2 E8(0980)                	call os_clear_screen
+   236 000001B5 E95DFE                  	jmp get_cmd
+   237                                  
+   238                                  
+   239                                  ; ------------------------------------------------------------------
+   240                                  
+   241                                  print_time:
+   242 000001B8 BB[BE04]                	mov bx, tmp_string
+   243 000001BB E8(5180)                	call os_get_time_string
+   244 000001BE 89DE                    	mov si, bx
+   245 000001C0 E8(0380)                	call os_print_string
+   246 000001C3 E8(0F80)                	call os_print_newline
+   247 000001C6 E94CFE                  	jmp get_cmd
+   248                                  
+   249                                  
+   250                                  ; ------------------------------------------------------------------
+   251                                  
+   252                                  print_date:
+   253 000001C9 BB[BE04]                	mov bx, tmp_string
+   254 000001CC E8(5A80)                	call os_get_date_string
+   255 000001CF 89DE                    	mov si, bx
+   256 000001D1 E8(0380)                	call os_print_string
+   257 000001D4 E8(0F80)                	call os_print_newline
+   258 000001D7 E93BFE                  	jmp get_cmd
+   259                                  
+   260                                  
+   261                                  ; ------------------------------------------------------------------
+   262                                  
+   263                                  print_ver:
+   264 000001DA E8(3B81)                	call os_get_os_name
+   265 000001DD E8(0380)                	call os_print_string
+   266 000001E0 E8(0F80)                	call os_print_newline
+   267 000001E3 E92FFE                  	jmp get_cmd
+   268                                  
+   269                                  
+   270                                  ; ------------------------------------------------------------------
+   271                                  
+   272                                  la_directory:
+   273                                  	clr cx
+    31 000001E6 31C9                <1>  xor %1, %1
+   274                                  
+   275 000001E8 B80040                  	mov ax, 16384		; Get comma-separated list of filenames
+   276 000001EB E8(3F80)                	call os_get_file_list
+   277                                  
+   278                                  	; Replace all of the ','s with 0s, the end should end in 4 (ASCII: End of transmission)
+   279                                  	
+   280 000001EE BE0040                  	mov si, 16384
+   281 000001F1 BF0040                  	mov di, 16384
+   282                                  	
+   283                                  .loop:
+   284 000001F4 AC                      	lodsb
+   285 000001F5 3C2C                    	cmp al, ','
+   286 000001F7 7504                    	jne .no_comma
+   287                                  	
+   288                                  	clr al
+    31 000001F9 30C0                <1>  xor %1, %1
+   289 000001FB EB0C                    	jmp .mod_loop
+   290                                  	
+   291                                  .no_comma:
+   292 000001FD 84C0                    	test al, al
+   293 000001FF 7508                    	jnz .mod_loop
+   294                                  	
+   295                                  	clr al
+    31 00000201 30C0                <1>  xor %1, %1
+   296 00000203 AA                      	stosb
+   297 00000204 B004                    	mov al, 4
+   298 00000206 AA                      	stosb
+   299 00000207 EB03                    	jmp .end
+   300                                  	
+   301                                  .mod_loop:
+   302 00000209 AA                      	stosb
+   303 0000020A EBE8                    	jmp .loop
+   304                                  	
+   305                                  .end:	
+   306 0000020C BE0040                  	mov si, 16384
+   307                                  
+   308                                  .repeat:
+   309 0000020F E8(0380)                	call os_print_string
+   310                                  	
+   311                                  	; Print file size
+   312                                  	
+   313 00000212 60                      	pusha
+   314 00000213 89F0                    	mov ax, si
+   315 00000215 E8(A280)                	call os_get_file_size
+   316 00000218 6689D8                  	mov eax, ebx
+   317                                  	
+   318 0000021B E8(6680)                	call os_get_cursor_pos
+   319 0000021E B214                    	mov dl, 20
+   320 00000220 E8(0680)                	call os_move_cursor
+   321 00000223 E8(B780)                	call os_print_32int
+   322 00000226 BE[E803]                	mov si, size_file.size_msg
+   323 00000229 E8(0380)                	call os_print_string
+   324 0000022C 61                      	popa
+   325                                  	
+   326                                  	; Print file date/time
+   327                                  	
+   328 0000022D 60                      	pusha
+   329 0000022E 89F0                    	mov ax, si
+   330 00000230 E8(F380)                	call os_get_file_datetime
+   331                                  
+   332 00000233 E8(6680)                	call os_get_cursor_pos
+   333 00000236 B228                    	mov dl, 40
+   334 00000238 E8(0680)                	call os_move_cursor
+   335                                  
+   336 0000023B 89C8                    	mov ax, cx		; Days
+   337 0000023D 83E01F                  	and ax, 11111b
+   338 00000240 E8(4D81)                	call os_print_int
+   339                                  	
+   340 00000243 BE[EE04]                	mov si, dateseparator
+   341 00000246 E8(0380)                	call os_print_string
+   342                                  
+   343 00000249 89C8                    	mov ax, cx		; Months
+   344 0000024B C1E805                  	shr ax, 5
+   345 0000024E 83E00F                  	and ax, 1111b
+   346 00000251 E8(4D81)                	call os_print_int
+   347                                  	
+   348 00000254 BE[EE04]                	mov si, dateseparator
+   349 00000257 E8(0380)                	call os_print_string
+   350                                  	
+   351 0000025A 89C8                    	mov ax, cx		; Years
+   352 0000025C C1E809                  	shr ax, 9
+   353 0000025F 05BC07                  	add ax, 1980
+   354 00000262 E8(4D81)                	call os_print_int
+   355                                  
+   356 00000265 E8(6980)                	call os_print_space
+   357                                  	
+   358 00000268 89D8                    	mov ax, bx		; Hours
+   359 0000026A C1E80B                  	shr ax, 11
+   360                                  
+   361 0000026D 83F80A                  	cmp ax, 10
+   362 00000270 7D06                    	jge .no_hour_zero
+   363                                  	
+   364 00000272 BE[F204]                	mov si, zerofill
+   365 00000275 E8(0380)                	call os_print_string
+   366                                  	
+   367                                  .no_hour_zero:
+   368 00000278 E8(4D81)                	call os_print_int
+   369                                  	
+   370 0000027B BE[F004]                	mov si, timeseparator
+   371 0000027E E8(0380)                	call os_print_string
+   372                                  	
+   373 00000281 89D8                    	mov ax, bx		; Minutes
+   374 00000283 C1E805                  	shr ax, 5
+   375 00000286 83E03F                  	and ax, 111111b
+   376                                  	
+   377 00000289 83F80A                  	cmp ax, 10
+   378 0000028C 7D06                    	jge .no_minute_zero
+   379                                  	
+   380 0000028E BE[F204]                	mov si, zerofill
+   381 00000291 E8(0380)                	call os_print_string
+   382                                  	
+   383                                  .no_minute_zero:
+   384 00000294 E8(4D81)                	call os_print_int
+   385                                  	
+   386 00000297 BE[F004]                	mov si, timeseparator
+   387 0000029A E8(0380)                	call os_print_string
+   388                                  	
+   389 0000029D 89D8                    	mov ax, bx		; Seconds
+   390 0000029F 83E01F                  	and ax, 11111b
+   391 000002A2 D1E0                    	shl ax, 1
+   392                                  	
+   393 000002A4 83F80A                  	cmp ax, 10
+   394 000002A7 7D06                    	jge .no_second_zero
+   395                                  	
+   396 000002A9 BE[F204]                	mov si, zerofill
+   397 000002AC E8(0380)                	call os_print_string
+   398                                  	
+   399                                  .no_second_zero:
+   400 000002AF E8(4D81)                	call os_print_int
+   401 000002B2 61                      	popa
+   402                                  	
+   403                                  	clr al
+    31 000002B3 30C0                <1>  xor %1, %1
+   404 000002B5 E8(6380)                	call os_find_char_in_string
+   405 000002B8 01C6                    	add si, ax
+   406                                  	
+   407 000002BA 803C04                  	cmp byte [si], 4
+   408 000002BD 7435                    	je .done
+   409                                  	
+   410 000002BF E8(0F80)                	call os_print_newline
+   411 000002C2 41                      	inc cx
+   412 000002C3 83F917                  	cmp cx, 23
+   413 000002C6 0F8545FF                	jne .repeat
+   414                                  	
+   415 000002CA E8(6680)                	call os_get_cursor_pos
+   416 000002CD 60                      	pusha
+   417                                  	mov16 dx, 0, 24
+    35 000002CE BA0018              <1>  mov %1, (%2 + %3 * 256)
+   418 000002D1 E8(0680)                	call os_move_cursor
+   419 000002D4 BE[D104]                	mov si, wait_string
+   420 000002D7 E8(0380)                	call os_print_string
+   421 000002DA E8(1280)                	call os_wait_for_key
+   422                                  	
+   423 000002DD E8(0680)                	call os_move_cursor
+   424 000002E0 B82009                  	mov ax, 0920h
+   425 000002E3 BB0700                  	mov bx, 7
+   426 000002E6 B95000                  	mov cx, 80
+   427 000002E9 CD10                    	int 10h	
+   428 000002EB 61                      	popa
+   429 000002EC E8(0680)                	call os_move_cursor
+   430                                  	clr cx
+    31 000002EF 31C9                <1>  xor %1, %1
+   431 000002F1 E91BFF                  	jmp .repeat
+   432                                  	
+   433                                  .done:
+   434 000002F4 E8(0F80)                	call os_print_newline
+   435 000002F7 E91BFD                  	jmp get_cmd
+   436                                  
+   437                                  
+   438                                  list_directory:
+   439 000002FA B80040                  	mov ax, 16384			; Get comma-separated list of filenames
+   440 000002FD E8(3F80)                	call os_get_file_list
+   441                                  
+   442 00000300 BE0040                  	mov si, 16384
+   443 00000303 B40E                    	mov ah, 0Eh			; BIOS teletype function
+   444                                  
+   445 00000305 E8(6680)                	call os_get_cursor_pos
+   446                                  	clr dl
+    31 00000308 30D2                <1>  xor %1, %1
+   447                                  	
+   448                                  .repeat:
+   449 0000030A AC                      	lodsb				; Start printing filenames
+   450 0000030B 84C0                    	test al, al			; Quit if end of string
+   451 0000030D 7428                    	jz .done
+   452                                  
+   453 0000030F 3C2C                    	cmp al, ','			; If comma in list string, don't print it
+   454 00000311 7519                    	jne .nonewline
+   455                                  	
+   456 00000313 80C210                  	add dl, 16
+   457 00000316 80FA50                  	cmp dl, 80
+   458 00000319 7C0C                    	jl .newline
+   459                                  	clr dl
+    31 0000031B 30D2                <1>  xor %1, %1
+   460 0000031D FEC6                    	inc dh
+   461 0000031F 80FE19                  	cmp dh, 25
+   462 00000322 740C                    	je .scroll
+   463 00000324 E8(0F80)                	call os_print_newline
+   464                                  .newline:
+   465 00000327 E8(0680)                	call os_move_cursor
+   466 0000032A EBDE                    	jmp .repeat
+   467                                  	
+   468                                  .nonewline:
+   469 0000032C CD10                    	int 10h
+   470 0000032E EBDA                    	jmp .repeat
+   471                                  	
+   472                                  .scroll:
+   473 00000330 B618                    	mov dh, 24
+   474 00000332 E8(0F80)                	call os_print_newline
+   475 00000335 EBF0                    	jmp .newline
+   476                                  	
+   477                                  .done:
+   478 00000337 E8(0F80)                	call os_print_newline
+   479 0000033A E9D8FC                  	jmp get_cmd
+   480                                  
+   481                                  
+   482                                  ; ------------------------------------------------------------------
+   483                                  
+   484                                  cat_file:
+   485 0000033D 8B36[CF04]              	mov word si, [param_list]
+   486 00000341 E8(C080)                	call os_string_parse
+   487 00000344 85C0                    	test ax, ax			; Was a filename provided?
+   488 00000346 7509                    	jnz .filename_provided
+   489                                  
+   490 00000348 BE[D006]                	mov si, catnofilename_msg		; If not, show error message
+   491 0000034B E8(0380)                	call os_print_string
+   492 0000034E E9C4FC                  	jmp get_cmd
+   493                                  
+   494                                  .filename_provided:
+   495 00000351 E8(9680)                	call os_file_exists		; Check if file exists
+   496 00000354 722A                    	jc .not_found
+   497                                  
+   498 00000356 B90010                  	mov cx, 4096			; Load file into second 32K
+   499 00000359 E8(2180)                	call os_load_file
+   500                                  
+   501 0000035C 891E[CD04]              	mov word [file_size], bx
+   502                                  
+   503 00000360 85DB                    	test bx, bx			; Nothing in the file?
+   504 00000362 0F84AFFC                	jz get_cmd
+   505                                  
+   506 00000366 BE0010                  	mov si, 4096
+   507 00000369 B40E                    	mov ah, 0Eh			; int 10h teletype function
+   508                                  .loop:
+   509 0000036B AC                      	lodsb				; Get byte from loaded file
+   510                                  
+   511 0000036C 3C0A                    	cmp al, 0Ah			; Move to start of line if we get a newline char
+   512 0000036E 7508                    	jne .not_newline
+   513                                  
+   514 00000370 E8(6680)                	call os_get_cursor_pos
+   515                                  	clr dl
+    31 00000373 30D2                <1>  xor %1, %1
+   516 00000375 E8(0680)                	call os_move_cursor
+   517                                  
+   518                                  .not_newline:
+   519 00000378 CD10                    	int 10h				; Display it
+   520 0000037A 4B                      	dec bx				; Count down file size
+   521 0000037B 75EE                    	jnz .loop			; End of file?
+   522                                  
+   523 0000037D E995FC                  	jmp get_cmd
+   524                                  
+   525                                  .not_found:
+   526 00000380 BE[5307]                	mov si, notfound_msg
+   527 00000383 E8(0380)                	call os_print_string
+   528 00000386 E98CFC                  	jmp get_cmd
+   529                                  
+   530                                  
+   531                                  ; ------------------------------------------------------------------
+   532                                  
+   533                                  del_file:
+   534 00000389 8B36[CF04]              	mov word si, [param_list]
+   535 0000038D E8(C080)                	call os_string_parse
+   536 00000390 85C0                    	test ax, ax			; Was a filename provided?
+   537 00000392 7509                    	jnz .filename_provided
+   538                                  
+   539 00000394 BE[3A07]                	mov si, delnofilename_msg		; If not, show error message
+   540 00000397 E8(0380)                	call os_print_string
+   541 0000039A E978FC                  	jmp get_cmd
+   542                                  
+   543                                  .filename_provided:
+   544 0000039D E8(9C80)                	call os_remove_file
+   545 000003A0 7209                    	jc .failure
+   546                                  
+   547 000003A2 BE[8207]                	mov si, success_msg
+   548 000003A5 E8(0380)                	call os_print_string
+   549 000003A8 E96AFC                  	jmp get_cmd
+   550                                  
+   551                                  .failure:
+   552 000003AB BE[6507]                	mov si, writefail_msg
+   553 000003AE E8(0380)                	call os_print_string
+   554 000003B1 E961FC                  	jmp get_cmd
+   555                                  
+   556                                  	
+   557                                  ; ------------------------------------------------------------------
+   558                                  
+   559                                  size_file:
+   560 000003B4 8B36[CF04]              	mov word si, [param_list]
+   561 000003B8 E8(C080)                	call os_string_parse
+   562 000003BB 85C0                    	test ax, ax			; Was a filename provided?
+   563 000003BD 7509                    	jnz .filename_provided
+   564                                  
+   565 000003BF BE[B606]                	mov si, sizenofilename_msg		; If not, show error message
+   566 000003C2 E8(0380)                	call os_print_string
+   567 000003C5 E94DFC                  	jmp get_cmd
+   568                                  
+   569                                  .filename_provided:
+   570 000003C8 E8(A280)                	call os_get_file_size
+   571 000003CB 7212                    	jc .failure
+   572                                  
+   573 000003CD 6689D8                  	mov eax, ebx
+   574 000003D0 E8(B780)                	call os_print_32int
+   575                                  
+   576 000003D3 BE[E803]                	mov si, .size_msg
+   577 000003D6 E8(0380)                	call os_print_string
+   578                                  
+   579 000003D9 E8(0F80)                	call os_print_newline
+   580 000003DC E936FC                  	jmp get_cmd
+   581                                  
+   582                                  
+   583                                  .failure:
+   584 000003DF BE[5307]                	mov si, notfound_msg
+   585 000003E2 E8(0380)                	call os_print_string
+   586 000003E5 E92DFC                  	jmp get_cmd
+   587                                  
+   588                                  
+   589 000003E8 20627974657300          	.size_msg	db ' bytes', 0
+   590                                  
+   591                                  
+   592                                  ; ------------------------------------------------------------------
+   593                                  
+   594                                  copy_file:
+   595 000003EF 8B36[CF04]              	mov word si, [param_list]
+   596 000003F3 E8(C080)                	call os_string_parse
+   597 000003F6 891E[4B04]              	mov word [.tmp], bx
+   598                                  
+   599 000003FA 85DB                    	test bx, bx			; Were two filenames provided?
+   600 000003FC 7509                    	jnz .filename_provided
+   601                                  
+   602 000003FE BE[E906]                	mov si, copynofilename_msg		; If not, show error message
+   603 00000401 E8(0380)                	call os_print_string
+   604 00000404 E90EFC                  	jmp get_cmd
+   605                                  
+   606                                  .filename_provided:
+   607 00000407 89C2                    	mov dx, ax			; Store first filename temporarily
+   608 00000409 89D8                    	mov ax, bx
+   609 0000040B E8(9680)                	call os_file_exists
+   610 0000040E 7332                    	jnc .already_exists
+   611                                  
+   612 00000410 89D0                    	mov ax, dx
+   613 00000412 B90010                  	mov cx, 4096
+   614 00000415 E8(2180)                	call os_load_file
+   615 00000418 7216                    	jc .load_fail
+   616                                  
+   617 0000041A 89D9                    	mov cx, bx
+   618 0000041C BB0010                  	mov bx, 4096
+   619 0000041F A1[4B04]                	mov word ax, [.tmp]
+   620 00000422 E8(9380)                	call os_write_file
+   621 00000425 7212                    	jc .write_fail
+   622                                  
+   623 00000427 BE[8207]                	mov si, success_msg
+   624 0000042A E8(0380)                	call os_print_string
+   625 0000042D E9E5FB                  	jmp get_cmd
+   626                                  
+   627                                  .load_fail:
+   628 00000430 BE[5307]                	mov si, notfound_msg
+   629 00000433 E8(0380)                	call os_print_string
+   630 00000436 E9DCFB                  	jmp get_cmd
+   631                                  
+   632                                  .write_fail:
+   633 00000439 BE[6507]                	mov si, writefail_msg
+   634 0000043C E8(0380)                	call os_print_string
+   635 0000043F E9D3FB                  	jmp get_cmd
+   636                                  
+   637                                  .already_exists:
+   638 00000442 BE[A407]                	mov si, exists_msg
+   639 00000445 E8(0380)                	call os_print_string
+   640 00000448 E9CAFB                  	jmp get_cmd
+   641                                  
+   642                                  
+   643 0000044B 0000                    	.tmp		dw 0
+   644                                  
+   645                                  	
+   646                                  ; ------------------------------------------------------------------
+   647                                  
+   648                                  ren_file:
+   649 0000044D 8B36[CF04]              	mov word si, [param_list]
+   650 00000451 E8(C080)                	call os_string_parse
+   651                                  
+   652 00000454 85DB                    	test bx, bx			; Were two filenames provided?
+   653 00000456 7509                    	jnz .filename_provided
+   654                                  
+   655 00000458 BE[1207]                	mov si, rennofilename_msg		; If not, show error message
+   656 0000045B E8(0380)                	call os_print_string
+   657 0000045E E9B4FB                  	jmp get_cmd
+   658                                  
+   659                                  .filename_provided:
+   660 00000461 89C1                    	mov cx, ax			; Store first filename temporarily
+   661 00000463 89D8                    	mov ax, bx			; Get destination
+   662 00000465 E8(9680)                	call os_file_exists		; Check to see if it exists
+   663 00000468 7310                    	jnc .already_exists
+   664                                  
+   665 0000046A 89C8                    	mov ax, cx			; Get first filename back
+   666 0000046C E8(9F80)                	call os_rename_file
+   667 0000046F 7212                    	jc .failure
+   668                                  
+   669 00000471 BE[8207]                	mov si, success_msg
+   670 00000474 E8(0380)                	call os_print_string
+   671 00000477 E99BFB                  	jmp get_cmd
+   672                                  
+   673                                  .already_exists:
+   674 0000047A BE[A407]                	mov si, exists_msg
+   675 0000047D E8(0380)                	call os_print_string
+   676 00000480 E992FB                  	jmp get_cmd
+   677                                  
+   678                                  .failure:
+   679 00000483 BE[8C04]                	mov si, .failure_msg
+   680 00000486 E8(0380)                	call os_print_string
+   681 00000489 E989FB                  	jmp get_cmd
+   682                                  
+   683 0000048C 46696C65206E6F7420-     	.failure_msg	db 'File not found', 13, 10, 0
+   683 00000495 666F756E640D0A00   
+   684                                  
+   685                                  
+   686                                  ; ------------------------------------------------------------------
+   687                                  
+   688                                  exit:
+   689 0000049D C3                      	ret
+   690                                  
+   691                                  ; ------------------------------------------------------------------
+   692                                  
+   693 0000049E 00<rep 20h>             	command			times 32 db 0
+   694                                  
+   695 000004BE 00<rep Fh>              	tmp_string		times 15 db 0
+   696                                  
+   697 000004CD 0000                    	file_size		dw 0
+   698 000004CF 0000                    	param_list		dw 0
+   699 000004D1 507265737320616E79-     	wait_string		db 'Press any key to continue...', 0
+   699 000004DA 206B657920746F2063-
+   699 000004E3 6F6E74696E75652E2E-
+   699 000004EC 2E00               
+   700 000004EE 2F00                    	dateseparator	db '/', 0
+   701 000004F0 3A00                    	timeseparator	db ':', 0
+   702 000004F2 3000                    	zerofill		db '0', 0
+   703                                  	
+   704                                  	
+   705 000004F4 2E41505000              	bin_extension		db '.APP', 0
+   706 000004F9 2E42415300              	bas_extension		db '.BAS', 0
+   707                                  
+   708 000004FE 3E2000                  	prompt			db '> ', 0
+   709                                  
+   710 00000501 4C532020202020203A-     	dir_help		db 'LS      : List the directory', 13, 10
+   710 0000050A 204C69737420746865-
+   710 00000513 206469726563746F72-
+   710 0000051C 790D0A             
+   711 0000051F 4C4C2020202020203A-     	la_help			db 'LL      : List the directory (with file sizes & date/time)', 13, 10
+   711 00000528 204C69737420746865-
+   711 00000531 206469726563746F72-
+   711 0000053A 792028776974682066-
+   711 00000543 696C652073697A6573-
+   711 0000054C 202620646174652F74-
+   711 00000555 696D65290D0A       
+   712 0000055B 43502020202020203A-     	copy_help		db 'CP      : Copy a file', 13, 10
+   712 00000564 20436F707920612066-
+   712 0000056D 696C650D0A         
+   713 00000572 4D562020202020203A-     	ren_help		db 'MV      : Rename a file', 13, 10
+   713 0000057B 2052656E616D652061-
+   713 00000584 2066696C650D0A     
+   714 0000058B 524D2020202020203A-     	del_help		db 'RM      : Delete a file', 13, 10
+   714 00000594 2044656C6574652061-
+   714 0000059D 2066696C650D0A     
+   715 000005A4 43415420202020203A-     	cat_help		db 'CAT     : Dump the file on the screen', 13, 10
+   715 000005AD 2044756D7020746865-
+   715 000005B6 2066696C65206F6E20-
+   715 000005BF 746865207363726565-
+   715 000005C8 6E0D0A             
+   716 000005CB 53495A45202020203A-     	size_help		db 'SIZE    : Tell a size of a file', 13, 10
+   716 000005D4 2054656C6C20612073-
+   716 000005DD 697A65206F66206120-
+   716 000005E6 66696C650D0A       
+   717 000005EC 434C4541522020203A-     	cls_help		db 'CLEAR   : Clear the screen', 13, 10
+   717 000005F5 20436C656172207468-
+   717 000005FE 652073637265656E0D-
+   717 00000607 0A                 
+   718 00000608 48454C50202020203A-     	help_help		db 'HELP    : Tell all the possible commands', 13, 10
+   718 00000611 2054656C6C20616C6C-
+   718 0000061A 2074686520706F7373-
+   718 00000623 69626C6520636F6D6D-
+   718 0000062C 616E64730D0A       
+   719 00000632 54494D45202020203A-     	time_help		db 'TIME    : Tell the time', 13, 10
+   719 0000063B 2054656C6C20746865-
+   719 00000644 2074696D650D0A     
+   720 0000064B 44415445202020203A-     	date_help		db 'DATE    : Tell the date', 13, 10
+   720 00000654 2054656C6C20746865-
+   720 0000065D 20646174650D0A     
+   721 00000664 56455220202020203A-     	ver_help		db 'VER     : MichalOS version', 13, 10
+   721 0000066D 204D696368616C4F53-
+   721 00000676 2076657273696F6E0D-
+   721 0000067F 0A                 
+   722 00000680 45584954202020203A-     	exit_help		db 'EXIT    : Quit', 13, 10, 0
+   722 00000689 20517569740D0A00   
+   723                                  	
+   724 00000691 496E76616C69642063-     	invalid_msg			db 'Invalid command', 13, 10, 0
+   724 0000069A 6F6D6D616E640D0A00 
+   725 000006A3 46696C616E616D6520-     	nofilename_msg		db 'Filaname missing', 13, 10, 0
+   725 000006AC 6D697373696E670D0A-
+   725 000006B5 00                 
+   726 000006B6 53796E7461783A2053-     	sizenofilename_msg	db 'Syntax: SIZE <filename>', 13, 10, 0
+   726 000006BF 495A45203C66696C65-
+   726 000006C8 6E616D653E0D0A00   
+   727 000006D0 53796E7461783A2043-     	catnofilename_msg	db 'Syntax: CAT <filename>', 13, 10, 0
+   727 000006D9 4154203C66696C656E-
+   727 000006E2 616D653E0D0A00     
+   728 000006E9 53796E7461783A2043-     	copynofilename_msg	db 'Syntax: COPY <filename> <new filename>', 13, 10, 0
+   728 000006F2 4F5059203C66696C65-
+   728 000006FB 6E616D653E203C6E65-
+   728 00000704 772066696C656E616D-
+   728 0000070D 653E0D0A00         
+   729 00000712 53796E7461783A2052-     	rennofilename_msg	db 'Syntax: REN <filename> <new filename>', 13, 10, 0
+   729 0000071B 454E203C66696C656E-
+   729 00000724 616D653E203C6E6577-
+   729 0000072D 2066696C656E616D65-
+   729 00000736 3E0D0A00           
+   730 0000073A 53796E7461783A2044-     	delnofilename_msg	db 'Syntax: DEL <filename>', 13, 10, 0
+   730 00000743 454C203C66696C656E-
+   730 0000074C 616D653E0D0A00     
+   731 00000753 46696C65206E6F7420-     	notfound_msg		db 'File not found.', 13, 10, 0
+   731 0000075C 666F756E642E0D0A00 
+   732 00000765 4572726F7220777269-     	writefail_msg		db 'Error writing to the disk.', 13, 10, 0
+   732 0000076E 74696E6720746F2074-
+   732 00000777 6865206469736B2E0D-
+   732 00000780 0A00               
+   733 00000782 4F7065726174696F6E-     	success_msg			db 'Operation successfully finished', 13, 10, 0
+   733 0000078B 207375636365737366-
+   733 00000794 756C6C792066696E69-
+   733 0000079D 736865640D0A00     
+   734 000007A4 46696C6520616C7265-     	exists_msg			db 'File already exists!', 13, 10, 0
+   734 000007AD 616479206578697374-
+   734 000007B6 73210D0A00         
+   735                                  
+   736 000007BB 205465726D696E616C-     	version_msg		db ' Terminal', 13, 10, 0
+   736 000007C4 0D0A00             
+   737 000007C7 466F72206D6F726520-     	help_msg		db 'For more information type "HELP".', 13, 10, 0
+   737 000007D0 696E666F726D617469-
+   737 000007D9 6F6E20747970652022-
+   737 000007E2 48454C50222E0D0A00 
+   738                                  	
+   739 000007EB 4558495400              	exit_string		db 'EXIT', 0
+   740 000007F0 48454C5000              	help_string		db 'HELP', 0
+   741 000007F5 434C45415200            	cls_string		db 'CLEAR', 0
+   742 000007FB 4C5300                  	dir_string		db 'LS', 0
+   743 000007FE 54494D4500              	time_string		db 'TIME', 0
+   744 00000803 4441544500              	date_string		db 'DATE', 0
+   745 00000808 56455200                	ver_string		db 'VER', 0
+   746 0000080C 43415400                	cat_string		db 'CAT', 0
+   747 00000810 524D00                  	del_string		db 'RM', 0
+   748 00000813 4D5600                  	ren_string		db 'MV', 0
+   749 00000816 435000                  	copy_string		db 'CP', 0
+   750 00000819 53495A4500              	size_string		db 'SIZE', 0
+   751 0000081E 4C4C00                  	la_string		db 'LL', 0
+   752                                  	
+   753                                  ; ==================================================================
+   754                                  
